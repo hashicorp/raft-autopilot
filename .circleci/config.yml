@@ -1,0 +1,72 @@
+version: 2
+
+references:
+  images:
+    go: &GOLANG_IMAGE circleci/golang:1.15
+    
+  cache:
+    modules: &GOMOD_CACHE_KEY raft-autopilot-modcache-v1-{{ checksum "go.sum" }}
+jobs:
+  go-fmt-and-vet:
+    docker:
+      - image: *GOLANG_IMAGE
+    steps:
+      - add_ssh_keys:
+          fingerprints:
+            - "c6:96:98:82:dc:04:6c:39:dd:ac:83:05:e3:15:1c:98" # circleci-key of hashicorp-ci user in GitHub
+      - checkout
+
+      # Restore go module cache if there is one
+      - restore_cache:
+          key: *GOMOD_CACHE_KEY
+
+      - run: go mod download
+
+      # Save go module cache if the go.mod file has changed
+      - save_cache:
+          key: *GOMOD_CACHE_KEY
+          paths:
+            - "/go/pkg/mod"
+
+      # check go fmt output because it does not report non-zero when there are fmt changes
+      - run:
+          name: check go fmt
+          command: |
+            files=$(go fmt ./...)
+            if [ -n "$files" ]; then
+              echo "The following file(s) do not conform to go fmt:"
+              echo "$files"
+              exit 1
+            fi
+      - run: go vet ./...
+
+  go-test:
+    docker:
+      - image: *GOLANG_IMAGE
+    environment:
+      - TEST_RESULTS: /tmp/test-results # path to where test results are saved
+    steps:
+      - checkout
+      - run: mkdir -p $TEST_RESULTS
+
+      # Restore go module cache if there is one
+      - restore_cache:
+          key: *GOMOD_CACHE_KEY
+
+      # run go tests with gotestsum
+      - run: |
+          PACKAGE_NAMES=$(go list ./...)
+          gotestsum --format=short-verbose --junitfile $TEST_RESULTS/gotestsum-report.xml -- $PACKAGE_NAMES
+      - store_test_results:
+          path: /tmp/test-results
+      - store_artifacts:
+          path: /tmp/test-results
+
+workflows:
+  version: 2
+  build:
+    jobs:
+      - go-fmt-and-vet
+      - go-test:
+          requires:
+            - go-fmt-and-vet
