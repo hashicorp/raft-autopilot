@@ -1,0 +1,104 @@
+{
+   "Now": "2020-11-02T15:00:00Z",
+   "StartTime": "2020-11-02T13:12:34Z",
+   "Config": {
+      "CleanupDeadServers": true,
+      "LastContactThreshold": 200000000,
+      "MaxTrailingLogs": 200,
+      "MinQuorum": 3,
+      "ServerStabilizationTime": 10000000000
+   },
+   "State": {
+      "Healthy": false
+   },
+   "RaftConfig": {
+      "Servers": [
+         {
+            "Suffrage": 0,
+            "ID": "7875975d-d54b-49c1-a400-9fefcc706c67",
+            "Address": "198.18.0.1:8300"
+         },
+         {
+            "Suffrage": 0,
+            "ID": "ecfc5237-63c3-4b09-94b9-d5682d9ae5b1",
+            "Address": "198.18.0.2:8300"
+         },
+         {
+            "Suffrage": 0,
+            "ID": "e72eb8da-604d-47cd-bd7f-69ec120ea2b7",
+            "Address": "198.18.0.3:8300"
+         }
+      ]
+   },
+   "KnownServers": {
+      "7875975d-d54b-49c1-a400-9fefcc706c67": {
+         "ID": "7875975d-d54b-49c1-a400-9fefcc706c67",
+         "Name": "node1",
+         "Address": "198.18.0.1:8300",
+         "NodeStatus": "alive",
+         "Version": "1.9.0",
+         "RaftVersion": 3
+      },
+      "ecfc5237-63c3-4b09-94b9-d5682d9ae5b1": {
+         "ID": "ecfc5237-63c3-4b09-94b9-d5682d9ae5b1",
+         "Name": "node2",
+         "Address": "198.18.0.2:8300",
+         "NodeStatus": "alive",
+         "Version": "1.9.0",
+         "RaftVersion": 3
+      },
+      "e72eb8da-604d-47cd-bd7f-69ec120ea2b7": {
+         "ID": "e72eb8da-604d-47cd-bd7f-69ec120ea2b7",
+         "Name": "node3",
+         "Address": "198.18.0.3:8300",
+         "NodeStatus": "alive",
+         "Version": "1.9.0",
+         "RaftVersion": 3
+      }
+   },
+   "AliveServers": {
+      "7875975d-d54b-49c1-a400-9fefcc706c67": {
+         "ID": "7875975d-d54b-49c1-a400-9fefcc706c67",
+         "Name": "node1",
+         "Address": "198.18.0.1:8300",
+         "NodeStatus": "alive",
+         "Version": "1.9.0",
+         "RaftVersion": 3
+      },
+      "ecfc5237-63c3-4b09-94b9-d5682d9ae5b1": {
+         "ID": "ecfc5237-63c3-4b09-94b9-d5682d9ae5b1",
+         "Name": "node2",
+         "Address": "198.18.0.2:8300",
+         "NodeStatus": "alive",
+         "Version": "1.9.0",
+         "RaftVersion": 3
+      },
+      "e72eb8da-604d-47cd-bd7f-69ec120ea2b7": {
+         "ID": "e72eb8da-604d-47cd-bd7f-69ec120ea2b7",
+         "Name": "node3",
+         "Address": "198.18.0.3:8300",
+         "NodeStatus": "alive",
+         "Version": "1.9.0",
+         "RaftVersion": 3
+      }
+   },
+   "LatestIndex": 1024,
+   "LastTerm": 3,
+   "FetchedStats": {
+      "7875975d-d54b-49c1-a400-9fefcc706c67": {
+         "LastTerm": 3,
+         "LastIndex": 1024
+      },
+      "ecfc5237-63c3-4b09-94b9-d5682d9ae5b1": {
+         "LastContact": 10000000,
+         "LastTerm": 3,
+         "LastIndex": 1000
+      },
+      "e72eb8da-604d-47cd-bd7f-69ec120ea2b7": {
+         "LastContact": 200001234,
+         "LastTerm": 3,
+         "LastIndex": 801
+      }
+   },
+   "LeaderAddress": "198.18.0.1:8300"
+}
