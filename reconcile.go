@@ -19,6 +19,10 @@ func (a *Autopilot) reconcile() error {
 	state := a.state
 	a.stateLock.Unlock()
 
+	if state == nil || state.Leader == "" {
+		return fmt.Errorf("Cannote reconcile Raft server voting rights without a valid autopilot state")
+	}
+
 	// have the promoter calculate the required Raft changeset.
 	changes := a.promoter.CalculatePromotionsAndDemotions(conf, state)
 
