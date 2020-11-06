@@ -27,17 +27,17 @@ func aliveServers(servers map[raft.ServerID]*Server) map[raft.ServerID]*Server {
 // nextStateInputs is the collection of values that can influence
 // creation of the next State.
 type nextStateInputs struct {
-	Now           time.Time
-	StartTime     time.Time
-	Config        *Config
-	State         *State
-	RaftConfig    *raft.Configuration
-	KnownServers  map[raft.ServerID]*Server
-	AliveServers  map[raft.ServerID]*Server
-	LatestIndex   uint64
-	LastTerm      uint64
-	FetchedStats  map[raft.ServerID]*ServerStats
-	LeaderAddress raft.ServerAddress
+	Now          time.Time
+	StartTime    time.Time
+	Config       *Config
+	State        *State
+	RaftConfig   *raft.Configuration
+	KnownServers map[raft.ServerID]*Server
+	AliveServers map[raft.ServerID]*Server
+	LatestIndex  uint64
+	LastTerm     uint64
+	FetchedStats map[raft.ServerID]*ServerStats
+	LeaderID     raft.ServerID
 }
 
 // gatherNextStateInputs gathers all the information that would be used to
@@ -85,6 +85,30 @@ func (a *Autopilot) gatherNextStateInputs(ctx context.Context) (*nextStateInputs
 	}
 	inputs.RaftConfig = raftConfig
 
+	leader := a.raft.Leader()
+	for _, s := range inputs.RaftConfig.Servers {
+		if s.Address == leader {
+			inputs.LeaderID = s.ID
+			break
+		}
+	}
+
+	if inputs.LeaderID == "" {
+		return nil, fmt.Errorf("cannot detect the current leader server id from its address: %s", leader)
+	}
+
+	// get the latest Raft index - this should be kept close to the call to
+	// fetch the statistics so that the index values are as close in time as
+	// possible to make the best decision regarding an individual servers
+	// healthiness.
+	inputs.LatestIndex = a.raft.LastIndex()
+
+	term, err := a.lastTerm()
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine the last Raft term: %w", err)
+	}
+	inputs.LastTerm = term
+
 	// getting the raft configuration could block for a while so now is a good
 	// time to check for context cancellation
 	if ctx.Err() != nil {
@@ -104,18 +128,6 @@ func (a *Autopilot) gatherNextStateInputs(ctx context.Context) (*nextStateInputs
 	// filter the known servers to have a map of just the alive servers
 	inputs.AliveServers = aliveServers(inputs.KnownServers)
 
-	// get the latest Raft index - this should be kept close to the call to
-	// fetch the statistics so that the index values are as close in time as
-	// possible to make the best decision regarding an individual servers
-	// healthiness.
-	inputs.LatestIndex = a.raft.LastIndex()
-
-	term, err := a.lastTerm()
-	if err != nil {
-		return nil, fmt.Errorf("failed to determine the last Raft term: %w", err)
-	}
-	inputs.LastTerm = term
-
 	// we only allow the fetch to take place for up to half the health interval
 	// the next health interval will attempt to fetch the stats again but if
 	// we do not see responses within this time then we can assume they are
@@ -125,8 +137,6 @@ func (a *Autopilot) gatherNextStateInputs(ctx context.Context) (*nextStateInputs
 	defer cancel()
 
 	inputs.FetchedStats = a.delegate.FetchServerStats(fetchCtx, inputs.AliveServers)
-
-	inputs.LeaderAddress = a.raft.Leader()
 
 	// it might be nil but we propagate the ctx.Err just in case our context was
 	// cancelled since the last time we checked.
@@ -142,7 +152,11 @@ func (a *Autopilot) nextState(ctx context.Context) (*State, error) {
 		return nil, err
 	}
 
-	return a.nextStateWithInputs(inputs), nil
+	state := a.nextStateWithInputs(inputs)
+	if state.Leader == "" {
+		return nil, fmt.Errorf("Unabled to detect the leader server")
+	}
+	return state, nil
 }
 
 // nextStateWithInputs computes the next state given pre-gathered inputs
@@ -185,7 +199,7 @@ func (a *Autopilot) nextStateWithInputs(inputs *nextStateInputs) *State {
 
 	// If we have extra healthy voters, update FailureTolerance from its
 	// zero value in the struct.
-	requiredQuorum := voterCount/2 + 1
+	requiredQuorum := requiredQuorum(voterCount)
 	if healthyVoters > requiredQuorum {
 		newState.FailureTolerance = healthyVoters - requiredQuorum
 	}
@@ -274,7 +288,7 @@ func buildServerState(inputs *nextStateInputs, srv raft.Server) ServerState {
 
 	// overwrite the raft state to mark the leader as such instead of just
 	// a regular voter
-	if srv.Address == inputs.LeaderAddress {
+	if srv.ID == inputs.LeaderID {
 		state.State = RaftLeader
 	}
 

@@ -146,7 +146,7 @@ func TestGatherNextStateInputs(t *testing.T) {
 		},
 	}
 
-	var leaderAddr raft.ServerAddress = "198.18.0.1:8300"
+	var leaderID raft.ServerID = "7875975d-d54b-49c1-a400-9fefcc706c67"
 
 	mdel.On("AutopilotConfig").Return(conf).Once()
 	mraft.On("GetConfiguration").Return(&raftConfigFuture{config: test3VoterRaftConfiguration}).Once()
@@ -154,20 +154,20 @@ func TestGatherNextStateInputs(t *testing.T) {
 	mraft.On("LastIndex").Return(lastIndex).Once()
 	mraft.On("Stats").Return(map[string]string{"last_log_term": "3"}).Once()
 	mdel.On("FetchServerStats", mock.Anything, servers).Return(serverStats).Once()
-	mraft.On("Leader").Return(leaderAddr).Once()
+	mraft.On("Leader").Return(raft.ServerAddress("198.18.0.1:8300")).Once()
 
 	expected := &nextStateInputs{
-		Now:           now,
-		StartTime:     ap.startTime,
-		Config:        conf,
-		State:         &State{Healthy: false},
-		RaftConfig:    &test3VoterRaftConfiguration,
-		KnownServers:  servers,
-		AliveServers:  servers,
-		LatestIndex:   lastIndex,
-		LastTerm:      lastTerm,
-		FetchedStats:  serverStats,
-		LeaderAddress: leaderAddr,
+		Now:          now,
+		StartTime:    ap.startTime,
+		Config:       conf,
+		State:        &State{Healthy: false},
+		RaftConfig:   &test3VoterRaftConfiguration,
+		KnownServers: servers,
+		AliveServers: servers,
+		LatestIndex:  lastIndex,
+		LastTerm:     lastTerm,
+		FetchedStats: serverStats,
+		LeaderID:     leaderID,
 	}
 
 	actual, err := ap.gatherNextStateInputs(context.Background())

@@ -174,8 +174,7 @@ func TestAddServer(t *testing.T) {
 		var newAddr raft.ServerAddress = "198.18.0.4:8300"
 
 		mraft.On("GetConfiguration").Return(&raftConfigFuture{config: test3VoterRaftConfiguration}).Once()
-		mraft.On("RemoveServer", existingID, uint64(0), time.Duration(0)).Return(&raftIndexFuture{}).Once()
-		mraft.On("AddNonvoter", existingID, newAddr, uint64(0), time.Duration(0)).Return(&raftIndexFuture{}).Once()
+		mraft.On("AddVoter", existingID, newAddr, uint64(0), time.Duration(0)).Return(&raftIndexFuture{}).Once()
 
 		require.Nil(t, ap.AddServer(&Server{ID: existingID, Address: newAddr}))
 		require.True(t, chanIsSelectable(ap.removeDeadCh))
@@ -221,6 +220,64 @@ func TestAddServer(t *testing.T) {
 
 		require.True(t, isInjectedError(ap.AddServer(&Server{ID: newID, Address: newAddr})))
 		require.False(t, chanIsSelectable(ap.removeDeadCh))
+	})
+
+	t.Run("error-for-unsafe-removals", func(t *testing.T) {
+		ap, mraft := mockedRaftAutopilot(t)
+
+		var newID raft.ServerID = "c3195ec1-c229-48c6-bdab-4db54ed04807"
+		var newAddr raft.ServerAddress = "198.18.0.2:8300"
+
+		mraft.On("GetConfiguration").Once().Return(&raftConfigFuture{
+			config: raft.Configuration{
+				Servers: []raft.Server{
+					{
+						ID:       "36ced65e-be2c-478d-a2f4-56a9706041d0",
+						Address:  "198.18.0.1:8300",
+						Suffrage: raft.Voter,
+					},
+					{
+						ID:       "e0c54c7c-1363-46d0-950b-2cb4aad347a8",
+						Address:  "198.18.0.2:8300",
+						Suffrage: raft.Voter,
+					},
+				},
+			},
+		})
+
+		err := ap.AddServer(&Server{ID: newID, Address: newAddr})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Preventing server addition that would require removal of too many servers and cause cluster instability")
+	})
+
+	t.Run("safe-non-voter-removals", func(t *testing.T) {
+		ap, mraft := mockedRaftAutopilot(t)
+
+		var existingID raft.ServerID = "e0c54c7c-1363-46d0-950b-2cb4aad347a8"
+		var newID raft.ServerID = "c3195ec1-c229-48c6-bdab-4db54ed04807"
+		var newAddr raft.ServerAddress = "198.18.0.2:8300"
+
+		mraft.On("GetConfiguration").Once().Return(&raftConfigFuture{
+			config: raft.Configuration{
+				Servers: []raft.Server{
+					{
+						ID:       "36ced65e-be2c-478d-a2f4-56a9706041d0",
+						Address:  "198.18.0.1:8300",
+						Suffrage: raft.Voter,
+					},
+					{
+						ID:       existingID,
+						Address:  "198.18.0.2:8300",
+						Suffrage: raft.Nonvoter,
+					},
+				},
+			},
+		})
+
+		mraft.On("RemoveServer", existingID, uint64(0), time.Duration(0)).Return(&raftIndexFuture{}).Once()
+		mraft.On("AddNonvoter", newID, newAddr, uint64(0), time.Duration(0)).Return(&raftIndexFuture{}).Once()
+		require.NoError(t, ap.AddServer(&Server{ID: newID, Address: newAddr}))
+		require.True(t, chanIsSelectable(ap.removeDeadCh))
 	})
 }
 

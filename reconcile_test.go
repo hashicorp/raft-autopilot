@@ -19,6 +19,7 @@ func TestReconcile(t *testing.T) {
 	cases := map[string]testCase{
 		"promote-one-and-filter-others-and-demotions": {
 			state: State{
+				Leader: "96be11f3-c9b9-45ab-a719-dc9472ada6fe",
 				Servers: map[raft.ServerID]*ServerState{
 					"96be11f3-c9b9-45ab-a719-dc9472ada6fe": {
 						Server: Server{
@@ -109,6 +110,7 @@ func TestReconcile(t *testing.T) {
 		},
 		"demotions-and-filter-leader-transfer": {
 			state: State{
+				Leader: "96be11f3-c9b9-45ab-a719-dc9472ada6fe",
 				Servers: map[raft.ServerID]*ServerState{
 					"96be11f3-c9b9-45ab-a719-dc9472ada6fe": {
 						Server: Server{
