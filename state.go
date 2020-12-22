@@ -33,7 +33,6 @@ type nextStateInputs struct {
 	State        *State
 	RaftConfig   *raft.Configuration
 	KnownServers map[raft.ServerID]*Server
-	AliveServers map[raft.ServerID]*Server
 	LatestIndex  uint64
 	LastTerm     uint64
 	FetchedStats map[raft.ServerID]*ServerStats
@@ -125,9 +124,6 @@ func (a *Autopilot) gatherNextStateInputs(ctx context.Context) (*nextStateInputs
 		return nil, ctx.Err()
 	}
 
-	// filter the known servers to have a map of just the alive servers
-	inputs.AliveServers = aliveServers(inputs.KnownServers)
-
 	// we only allow the fetch to take place for up to half the health interval
 	// the next health interval will attempt to fetch the stats again but if
 	// we do not see responses within this time then we can assume they are
@@ -136,7 +132,7 @@ func (a *Autopilot) gatherNextStateInputs(ctx context.Context) (*nextStateInputs
 	fetchCtx, cancel := context.WithDeadline(ctx, d)
 	defer cancel()
 
-	inputs.FetchedStats = a.delegate.FetchServerStats(fetchCtx, inputs.AliveServers)
+	inputs.FetchedStats = a.delegate.FetchServerStats(fetchCtx, aliveServers(inputs.KnownServers))
 
 	// it might be nil but we propagate the ctx.Err just in case our context was
 	// cancelled since the last time we checked.

@@ -163,7 +163,6 @@ func TestGatherNextStateInputs(t *testing.T) {
 		State:        &State{Healthy: false},
 		RaftConfig:   &test3VoterRaftConfiguration,
 		KnownServers: servers,
-		AliveServers: servers,
 		LatestIndex:  lastIndex,
 		LastTerm:     lastTerm,
 		FetchedStats: serverStats,
