@@ -166,6 +166,7 @@ func New(raft Raft, delegate ApplicationIntegration, options ...Option) *Autopil
 	a := &Autopilot{
 		raft:     raft,
 		delegate: delegate,
+		state:    &State{},
 		promoter: DefaultPromoter(),
 		logger:   hclog.Default().Named("autopilot"),
 		// should this be buffered?
