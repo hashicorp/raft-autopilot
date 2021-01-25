@@ -75,6 +75,14 @@ func WithPromoter(promoter Promoter) Option {
 	}
 }
 
+type runStatus int
+
+const (
+	notRunning runStatus = iota
+	running
+	shuttingDown
+)
+
 // Autopilot is the type to manage a running Raft instance.
 //
 // Each Raft node in the cluster will have a corresponding Autopilot instance but
@@ -132,9 +140,8 @@ type Autopilot struct {
 	// brought up.
 	startTime time.Time
 
-	// running is a simple bool to indicate whether the go routines to actually
-	// execute autopilot are currently running
-	running bool
+	// status is the current state of autopilot executation
+	status runStatus
 
 	// removeDeadCh is used to trigger the running autopilot go routines to
 	// find and remove any dead/failed servers

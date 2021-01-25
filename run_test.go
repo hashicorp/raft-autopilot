@@ -161,7 +161,7 @@ func TestRunLifeCycle(t *testing.T) {
 	ap.Start(ctx)
 
 	ap.runLock.Lock()
-	require.True(t, ap.running)
+	require.Equal(t, running, ap.status)
 	require.NotNil(t, ap.shutdown)
 	require.Equal(t, startTime, ap.startTime)
 	require.NotNil(t, ap.done)

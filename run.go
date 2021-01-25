@@ -2,19 +2,42 @@ package autopilot
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
 
 // Start will launch the go routines in the background to perform Autopilot.
 // When the context passed in is cancelled or the Stop method is called
 // then these routines will exit.
-func (a *Autopilot) Start(ctx context.Context) {
+func (a *Autopilot) Start(ctx context.Context) error {
 	a.runLock.Lock()
 	defer a.runLock.Unlock()
 
 	// already running so there is nothing to do
-	if a.running {
-		return
+	if a.status == running {
+		return nil
+	}
+
+	// if we are shutting down return an error. Really there could be
+	// 3 options. 
+	//
+	//   - Refactor autopilot execution management so that multiple
+	//     autopilot routines can be running concurrently in the
+	//     case where one is shut down. As these could potentially
+	//     both be affecting the autopilot state this doesn't seem
+	//     like a great idea.
+	//   - Return an error here
+	//   - Block here until the existing routine finishes. That would
+	//     be finicky at best as we would haveto relinquish the runLock
+	//     wait and then regain the lock to retry the whole Start routine.
+	//     This could race with other routines attempting a start too.
+	//
+	// The most simple solution is to just error here. If an application needs
+	// to ensure that autopilot is running then they can retry the start or
+	// potentially use the chan returned by Stop to know when we are actually
+	// stopped.
+	if a.status == shuttingDown {
+		return fmt.Errorf("Autopilot is currently shutting down")
 	}
 
 	ctx, shutdown := context.WithCancel(ctx)
@@ -32,7 +55,8 @@ func (a *Autopilot) Start(ctx context.Context) {
 	a.updateState(updateCtx)
 
 	go a.run(ctx)
-	a.running = true
+	a.status = running
+	return nil
 }
 
 // Stop will terminate the go routines being executed to perform autopilot.
@@ -41,13 +65,14 @@ func (a *Autopilot) Stop() <-chan struct{} {
 	defer a.runLock.Unlock()
 
 	// Nothing to do
-	if !a.running {
+	if a.status == notRunning {
 		done := make(chan struct{})
 		close(done)
 		return done
 	}
 
 	a.shutdown()
+	a.status = shuttingDown
 	return a.done
 }
 
@@ -80,7 +105,7 @@ func (a *Autopilot) run(ctx context.Context) {
 
 		a.runLock.Lock()
 		a.shutdown = nil
-		a.running = false
+		a.status = notRunning
 		// this should be the final cleanup task as it is what notifies the rest
 		// of the world that we are now done
 		close(a.done)
