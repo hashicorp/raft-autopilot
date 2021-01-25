@@ -8,31 +8,41 @@ import (
 // Start will launch the go routines in the background to perform Autopilot.
 // When the context passed in is cancelled or the Stop method is called
 // then these routines will exit.
-func (a *Autopilot) Start(ctx context.Context) {
+func (a *Autopilot) Start(ctx context.Context) error {
 	a.runLock.Lock()
 	defer a.runLock.Unlock()
 
 	// already running so there is nothing to do
-	if a.running {
-		return
+	if a.execution != nil && a.execution.status == Running {
+		return nil
 	}
 
 	ctx, shutdown := context.WithCancel(ctx)
-	a.shutdown = shutdown
 	a.startTime = a.time.Now()
-	a.done = make(chan struct{})
 
-	// While a go routine executed by a.run below will periodically
-	// update the state, we want to go ahead and force updating it now
-	// so that during a leadership transfer we don't report an empty
-	// autopilot state. We put a pretty small timeout on this though
-	// so as to prevent leader establishment from taking too long
-	updateCtx, updateCancel := context.WithTimeout(ctx, time.Second)
-	defer updateCancel()
-	a.updateState(updateCtx)
+	exec := &execInfo{
+		status:   Running,
+		shutdown: shutdown,
+		done:     make(chan struct{}),
+	}
 
-	go a.run(ctx)
-	a.running = true
+	if a.execution == nil || a.execution.status == NotRunning {
+		// While a go routine executed by a.run below will periodically
+		// update the state, we want to go ahead and force updating it now
+		// so that during a leadership transfer we don't report an empty
+		// autopilot state. We put a pretty small timeout on this though
+		// so as to prevent leader establishment from taking too long. This
+		// only is done if we are not running and not shutting down so
+		// as to prevent conflicts with any autopilot routine just finishing
+		// up such as when restarting autopilot.
+		updateCtx, updateCancel := context.WithTimeout(ctx, time.Second)
+		defer updateCancel()
+		a.updateState(updateCtx)
+	}
+
+	go a.run(ctx, exec)
+	a.execution = exec
+	return nil
 }
 
 // Stop will terminate the go routines being executed to perform autopilot.
@@ -41,18 +51,58 @@ func (a *Autopilot) Stop() <-chan struct{} {
 	defer a.runLock.Unlock()
 
 	// Nothing to do
-	if !a.running {
+	if a.execution == nil || a.execution.status == NotRunning {
 		done := make(chan struct{})
 		close(done)
 		return done
 	}
 
-	a.shutdown()
-	return a.done
+	a.execution.shutdown()
+	a.execution.status = ShuttingDown
+	return a.execution.done
 }
 
-func (a *Autopilot) run(ctx context.Context) {
+// IsRunning returns the current execution status of the autopilot
+// go routines as well as a chan which will be closed when the
+// routines are no longer running
+func (a *Autopilot) IsRunning() (ExecutionStatus, <-chan struct{}) {
+	a.runLock.Lock()
+	defer a.runLock.Unlock()
+
+	if a.execution == nil || a.execution.status == NotRunning {
+		done := make(chan struct{})
+		close(done)
+		return NotRunning, done
+	}
+
+	return a.execution.status, a.execution.done
+}
+
+func (a *Autopilot) endRun(exec *execInfo) {
+	// need to gain the lock because if this was the active execution
+	// then these values may be read while they are updated.
+	a.runLock.Lock()
+	defer a.runLock.Unlock()
+
+	exec.shutdown = nil
+	exec.status = NotRunning
+	// this should be the final cleanup task as it is what notifies the rest
+	// of the world that we are now done
+	close(exec.done)
+	exec.done = nil
+}
+
+func (a *Autopilot) run(ctx context.Context, exec *execInfo) {
+	// This will wait for any other go routine to finish executing
+	// before running any code ourselves to prevent any conflicting
+	// activity between the two.
+	if err := a.execMutex.TryLock(ctx); err != nil {
+		a.endRun(exec)
+		return
+	}
+
 	a.logger.Debug("autopilot is now running")
+
 	// autopilot needs to do 3 things
 	//
 	// 1. periodically update the cluster state
@@ -78,14 +128,8 @@ func (a *Autopilot) run(ctx context.Context) {
 
 		a.logger.Debug("autopilot is now stopped")
 
-		a.runLock.Lock()
-		a.shutdown = nil
-		a.running = false
-		// this should be the final cleanup task as it is what notifies the rest
-		// of the world that we are now done
-		close(a.done)
-		a.done = nil
-		a.runLock.Unlock()
+		a.endRun(exec)
+		a.execMutex.Unlock()
 	}()
 
 	reconcileTicker := time.NewTicker(a.reconcileInterval)

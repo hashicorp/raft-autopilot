@@ -75,6 +75,31 @@ func WithPromoter(promoter Promoter) Option {
 	}
 }
 
+// ExecutionStatus represents the current status of the autopilot background go routines
+type ExecutionStatus string
+
+const (
+	NotRunning   ExecutionStatus = "not-running"
+	Running      ExecutionStatus = "running"
+	ShuttingDown ExecutionStatus = "shutting-down"
+)
+
+type execInfo struct {
+	// status is the current state of autopilot executation
+	status ExecutionStatus
+
+	// shutdown is a function that can be execute to shutdown a running
+	// autopilot's go routines.
+	shutdown context.CancelFunc
+
+	// done is a chan that will be closed when the running autopilot go
+	// routines have exited. Technically closing it is the very last
+	// thing done in the go routine but at that point enough state has
+	// been cleaned up that we would then allow it to be started
+	// immediately afterward
+	done chan struct{}
+}
+
 // Autopilot is the type to manage a running Raft instance.
 //
 // Each Raft node in the cluster will have a corresponding Autopilot instance but
@@ -132,10 +157,6 @@ type Autopilot struct {
 	// brought up.
 	startTime time.Time
 
-	// running is a simple bool to indicate whether the go routines to actually
-	// execute autopilot are currently running
-	running bool
-
 	// removeDeadCh is used to trigger the running autopilot go routines to
 	// find and remove any dead/failed servers
 	removeDeadCh chan struct{}
@@ -143,15 +164,13 @@ type Autopilot struct {
 	// reconcileCh is used to trigger an immediate round of reconciliation.
 	reconcileCh chan struct{}
 
-	// shutdown is a function that can be execute to shutdown a running
-	// autopilot's go routines.
-	shutdown context.CancelFunc
-	// done is a chan that will be closed when the running autopilot go
-	// routines have exited. Technically closing it is the very last
-	// thing done in the go routine but at that point enough state has
-	// been cleaned up that we would then allow it to be started
-	// immediately afterward
-	done chan struct{}
+	// execution is the information about the current autopilot execution
+	// Start will initialize this with the most recent execution
+	execution *execInfo
+
+	// execMutex implements a cancellable mutex that will be used to ensure
+	// that only one autopilot go routine is executing at once.
+	execMutex *mutex
 
 	// runLock is meant to protect all of the fields regarding coordination
 	// of whether the autopilot go routines are running and
@@ -174,6 +193,7 @@ func New(raft Raft, delegate ApplicationIntegration, options ...Option) *Autopil
 		reconcileInterval: DefaultReconcileInterval,
 		updateInterval:    DefaultUpdateInterval,
 		time:              &runtimeTimeProvider{},
+		execMutex:         newMutex(),
 	}
 
 	for _, opt := range options {
