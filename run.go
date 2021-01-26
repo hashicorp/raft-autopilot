@@ -8,13 +8,13 @@ import (
 // Start will launch the go routines in the background to perform Autopilot.
 // When the context passed in is cancelled or the Stop method is called
 // then these routines will exit.
-func (a *Autopilot) Start(ctx context.Context) error {
+func (a *Autopilot) Start(ctx context.Context) {
 	a.execLock.Lock()
 	defer a.execLock.Unlock()
 
 	// already running so there is nothing to do
 	if a.execution != nil && a.execution.status == Running {
-		return nil
+		return
 	}
 
 	ctx, shutdown := context.WithCancel(ctx)
@@ -42,7 +42,7 @@ func (a *Autopilot) Start(ctx context.Context) error {
 
 	go a.beginExecution(ctx, exec)
 	a.execution = exec
-	return nil
+	return
 }
 
 // Stop will terminate the go routines being executed to perform autopilot.
