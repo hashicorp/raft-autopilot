@@ -9,8 +9,8 @@ import (
 // When the context passed in is cancelled or the Stop method is called
 // then these routines will exit.
 func (a *Autopilot) Start(ctx context.Context) error {
-	a.runLock.Lock()
-	defer a.runLock.Unlock()
+	a.execLock.Lock()
+	defer a.execLock.Unlock()
 
 	// already running so there is nothing to do
 	if a.execution != nil && a.execution.status == Running {
@@ -27,28 +27,28 @@ func (a *Autopilot) Start(ctx context.Context) error {
 	}
 
 	if a.execution == nil || a.execution.status == NotRunning {
-		// While a go routine executed by a.run below will periodically
-		// update the state, we want to go ahead and force updating it now
-		// so that during a leadership transfer we don't report an empty
-		// autopilot state. We put a pretty small timeout on this though
-		// so as to prevent leader establishment from taking too long. This
-		// only is done if we are not running and not shutting down so
-		// as to prevent conflicts with any autopilot routine just finishing
-		// up such as when restarting autopilot.
-		updateCtx, updateCancel := context.WithTimeout(ctx, time.Second)
-		defer updateCancel()
-		a.updateState(updateCtx)
+		// In theory with a nil execution or the current execution being in the not
+		// running state, we should be able to immediately gain the leader lock as
+		// nothing else should be running and holding the lock. While true we still
+		// gain the lock to ensure that only one thread may even attempt to be
+		// modifying the autopilot state at once.
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		if err := a.leaderLock.TryLock(ctx); err == nil {
+			a.updateState(ctx)
+			a.leaderLock.Unlock()
+		}
 	}
 
-	go a.run(ctx, exec)
+	go a.beginExecution(ctx, exec)
 	a.execution = exec
 	return nil
 }
 
 // Stop will terminate the go routines being executed to perform autopilot.
 func (a *Autopilot) Stop() <-chan struct{} {
-	a.runLock.Lock()
-	defer a.runLock.Unlock()
+	a.execLock.Lock()
+	defer a.execLock.Unlock()
 
 	// Nothing to do
 	if a.execution == nil || a.execution.status == NotRunning {
@@ -66,8 +66,8 @@ func (a *Autopilot) Stop() <-chan struct{} {
 // go routines as well as a chan which will be closed when the
 // routines are no longer running
 func (a *Autopilot) IsRunning() (ExecutionStatus, <-chan struct{}) {
-	a.runLock.Lock()
-	defer a.runLock.Unlock()
+	a.execLock.Lock()
+	defer a.execLock.Unlock()
 
 	if a.execution == nil || a.execution.status == NotRunning {
 		done := make(chan struct{})
@@ -78,11 +78,11 @@ func (a *Autopilot) IsRunning() (ExecutionStatus, <-chan struct{}) {
 	return a.execution.status, a.execution.done
 }
 
-func (a *Autopilot) endRun(exec *execInfo) {
+func (a *Autopilot) finishExecution(exec *execInfo) {
 	// need to gain the lock because if this was the active execution
 	// then these values may be read while they are updated.
-	a.runLock.Lock()
-	defer a.runLock.Unlock()
+	a.execLock.Lock()
+	defer a.execLock.Unlock()
 
 	exec.shutdown = nil
 	exec.status = NotRunning
@@ -92,12 +92,12 @@ func (a *Autopilot) endRun(exec *execInfo) {
 	exec.done = nil
 }
 
-func (a *Autopilot) run(ctx context.Context, exec *execInfo) {
+func (a *Autopilot) beginExecution(ctx context.Context, exec *execInfo) {
 	// This will wait for any other go routine to finish executing
 	// before running any code ourselves to prevent any conflicting
 	// activity between the two.
-	if err := a.execMutex.TryLock(ctx); err != nil {
-		a.endRun(exec)
+	if err := a.leaderLock.TryLock(ctx); err != nil {
+		a.finishExecution(exec)
 		return
 	}
 
@@ -128,8 +128,8 @@ func (a *Autopilot) run(ctx context.Context, exec *execInfo) {
 
 		a.logger.Debug("autopilot is now stopped")
 
-		a.endRun(exec)
-		a.execMutex.Unlock()
+		a.finishExecution(exec)
+		a.leaderLock.Unlock()
 	}()
 
 	reconcileTicker := time.NewTicker(a.reconcileInterval)

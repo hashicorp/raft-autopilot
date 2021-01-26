@@ -162,14 +162,14 @@ func TestRunLifeCycle(t *testing.T) {
 
 	ap.Start(ctx)
 
-	ap.runLock.Lock()
+	ap.execLock.Lock()
 	require.NotNil(t, ap.execution)
 	require.Equal(t, Running, ap.execution.status)
 	require.NotNil(t, ap.execution.shutdown)
 	require.Equal(t, startTime, ap.startTime)
 	require.NotNil(t, ap.execution.done)
 	require.False(t, chanIsSelectable(ap.execution.done))
-	ap.runLock.Unlock()
+	ap.execLock.Unlock()
 
 	status, ch := ap.IsRunning()
 	require.Equal(t, Running, status)
@@ -199,7 +199,7 @@ func TestRunLifeCycle(t *testing.T) {
 	ap.execution = &execInfo{
 		status: ShuttingDown,
 	}
-	ap.execMutex.Lock()
+	ap.leaderLock.Lock()
 
 	// start autopilot while the execution lock is held. This
 	// will cause the spawned go routine to sit idle until the

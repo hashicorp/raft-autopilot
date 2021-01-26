@@ -164,18 +164,20 @@ type Autopilot struct {
 	// reconcileCh is used to trigger an immediate round of reconciliation.
 	reconcileCh chan struct{}
 
-	// execution is the information about the current autopilot execution
-	// Start will initialize this with the most recent execution
+	// leaderLock implements a cancellable mutex that will be used to ensure
+	// that only one autopilot go routine is the "leader". The leader is
+	// the go routine that is currently responsible for updating the
+	// autopilot state and performing raft promotions/demotions.
+	leaderLock *mutex
+
+	// execution is the information about the most recent autopilot execution.
+	// Start will initialize this with the most recent execution and it will
+	// be updated by Stop and by the go routines being executed when they are
+	// finished.
 	execution *execInfo
 
-	// execMutex implements a cancellable mutex that will be used to ensure
-	// that only one autopilot go routine is executing at once.
-	execMutex *mutex
-
-	// runLock is meant to protect all of the fields regarding coordination
-	// of whether the autopilot go routines are running and
-	// starting/stopping them.
-	runLock sync.Mutex
+	// execLock protects access to the execution field
+	execLock sync.Mutex
 }
 
 // New will create a new Autopilot instance utilizing the given Raft and Delegate.
@@ -193,7 +195,7 @@ func New(raft Raft, delegate ApplicationIntegration, options ...Option) *Autopil
 		reconcileInterval: DefaultReconcileInterval,
 		updateInterval:    DefaultUpdateInterval,
 		time:              &runtimeTimeProvider{},
-		execMutex:         newMutex(),
+		leaderLock:        newMutex(),
 	}
 
 	for _, opt := range options {
