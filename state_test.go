@@ -250,7 +250,7 @@ func TestNextStateWithInputs(t *testing.T) {
 					"e72eb8da-604d-47cd-bd7f-69ec120ea2b7": NodeVoter,
 				}).Once()
 			},
-			setupState: func(t *testing.T, state *State) {
+			setupState: func(_ *testing.T, state *State) {
 				state.Servers = map[raft.ServerID]*ServerState{
 					"e72eb8da-604d-47cd-bd7f-69ec120ea2b7": {
 						Server: Server{},

@@ -79,9 +79,11 @@ func TestRunLifeCycle(t *testing.T) {
 
 	startTime := time.Date(2020, 11, 2, 12, 0, 0, 0, time.UTC)
 	nextStateTime := time.Date(2020, 11, 2, 12, 0, 0, 10000, time.UTC)
+	blockedStartTime := time.Date(2021, 1, 25, 16, 0, 0, 10000, time.UTC)
 
 	mtime.On("Now").Return(startTime).Once()
 	mtime.On("Now").Return(nextStateTime).Once()
+	mtime.On("Now").Return(blockedStartTime).Once()
 
 	// now validate the initial state
 	expected := &State{
@@ -160,13 +162,19 @@ func TestRunLifeCycle(t *testing.T) {
 
 	ap.Start(ctx)
 
-	ap.runLock.Lock()
-	require.True(t, ap.running)
-	require.NotNil(t, ap.shutdown)
+	ap.execLock.Lock()
+	require.NotNil(t, ap.execution)
+	require.Equal(t, Running, ap.execution.status)
+	require.NotNil(t, ap.execution.shutdown)
 	require.Equal(t, startTime, ap.startTime)
-	require.NotNil(t, ap.done)
-	require.False(t, chanIsSelectable(ap.done))
-	ap.runLock.Unlock()
+	require.NotNil(t, ap.execution.done)
+	require.False(t, chanIsSelectable(ap.execution.done))
+	ap.execLock.Unlock()
+
+	status, ch := ap.IsRunning()
+	require.Equal(t, Running, status)
+	require.NotNil(t, ch)
+	require.False(t, chanIsSelectable(ch))
 
 	actual := ap.GetState()
 
@@ -175,10 +183,39 @@ func TestRunLifeCycle(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return chanIsSelectable(done)
 	}, time.Second, 50*time.Millisecond)
+	require.True(t, chanIsSelectable(ch))
+
+	status, ch = ap.IsRunning()
+	require.Equal(t, NotRunning, status)
+	require.NotNil(t, ch)
+	require.True(t, chanIsSelectable(ch))
 
 	done = ap.Stop()
 	require.NotNil(t, done)
 	require.True(t, chanIsSelectable(done))
-
 	require.Equal(t, expected, actual)
+
+	// simulate shutting down of the previous go routine taking a long time
+	ap.execution = &execInfo{
+		status: ShuttingDown,
+	}
+	ap.leaderLock.Lock()
+
+	// start autopilot while the execution lock is held. This
+	// will cause the spawned go routine to sit idle until the
+	// lock is relinquished or until it is cancelled.
+	ap.Start(context.Background())
+	require.NotNil(t, ap.execution)
+	require.Equal(t, Running, ap.execution.status)
+	// Note that because the pre-existing state was shuttingDown
+	// then we are expecting no more calls to the various mocked
+	// interfaces to ensure that this Start never gets to the
+	// point of executing most of the code but instead gets
+	// stuck in waiting on the lock and then cancelled.
+
+	done = ap.Stop()
+	require.NotNil(t, done)
+	require.Eventually(t, func() bool {
+		return chanIsSelectable(done)
+	}, time.Second, 50*time.Millisecond)
 }
