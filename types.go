@@ -85,7 +85,7 @@ type Server struct {
 	Version     string
 	Meta        map[string]string
 	RaftVersion int
-	IsLeader bool
+	IsLeader    bool
 
 	// The remaining fields are those that the promoter
 	// will fill in

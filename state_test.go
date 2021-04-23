@@ -81,7 +81,7 @@ func TestAliveServers(t *testing.T) {
 	require.Equal(t, expected, actual)
 }
 
-func TestGatherNextStateInputsLeaderFromDelegate(t *testing.T){
+func TestGatherNextStateInputsLeaderFromDelegate(t *testing.T) {
 	mtime := NewMockTimeProvider(t)
 	mraft := NewMockRaft(t)
 	mdel := NewMockApplicationIntegration(t)
@@ -109,7 +109,7 @@ func TestGatherNextStateInputsLeaderFromDelegate(t *testing.T){
 			NodeStatus:  NodeAlive,
 			Version:     "1.9.0",
 			RaftVersion: 3,
-			IsLeader: true,
+			IsLeader:    true,
 		},
 		"ecfc5237-63c3-4b09-94b9-d5682d9ae5b1": {
 			ID:          "ecfc5237-63c3-4b09-94b9-d5682d9ae5b1",

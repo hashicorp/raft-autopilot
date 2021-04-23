@@ -75,7 +75,7 @@ func (a *Autopilot) gatherNextStateInputs(ctx context.Context) (*nextStateInputs
 	inputs.KnownServers = a.delegate.KnownServers()
 
 	// Try to retrieve leader id from the delegate.
-	for id, srv := range inputs.KnownServers{
+	for id, srv := range inputs.KnownServers {
 		if srv.IsLeader {
 			inputs.LeaderID = id
 			break
