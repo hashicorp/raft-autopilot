@@ -13,7 +13,7 @@ jobs:
     steps:
       - add_ssh_keys:
           fingerprints:
-            - "c6:96:98:82:dc:04:6c:39:dd:ac:83:05:e3:15:1c:98" # circleci-key of hashicorp-ci user in GitHub
+            - "00:c9:a8:30:5f:3c:98:d9:c2:a3:a2:c9:9e:96:72:31" # circleci-key of hc-github-team-wg-raft user in GitHub
       - checkout
 
       # Restore go module cache if there is one
