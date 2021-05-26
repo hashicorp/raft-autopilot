@@ -182,13 +182,13 @@ func TestServerStabilizationTime(t *testing.T) {
 	}
 
 	s := &State{
-		startTime: time.Now(),
+		firstStateTime: time.Now(),
 	}
 
 	require.Equal(t, 0*time.Nanosecond, s.ServerStabilizationTime(conf))
 
 	require.Eventually(t, func() bool {
 		return s.ServerStabilizationTime(conf) == 350*time.Millisecond
-	}, 500*time.Millisecond, 75*time.Millisecond)
+	}, 500*time.Millisecond, 50*time.Millisecond)
 
 }

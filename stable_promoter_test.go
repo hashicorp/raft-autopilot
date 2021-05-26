@@ -30,7 +30,7 @@ func TestStablePromoter_GetNodeTypes(t *testing.T) {
 
 func TestStablePromoter_CalculatePromotionsAndDemotions(t *testing.T) {
 	state := &State{
-		startTime: time.Now().Add(-30 * time.Second),
+		firstStateTime: time.Now().Add(-30 * time.Second),
 		Servers: map[raft.ServerID]*ServerState{
 			// alread the leader - will not promote
 			"462fca30-0947-4d5c-82e0-c549b0bf5b6d": {

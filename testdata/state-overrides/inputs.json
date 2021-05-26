@@ -1,6 +1,6 @@
 {
    "Now": "2020-11-02T15:00:00Z",
-   "StartTime": "2020-11-02T13:12:34Z",
+   "FirstStateTime": "2020-11-02T13:12:34Z",
    "Config": {
       "CleanupDeadServers": true,
       "LastContactThreshold": 200000000,
