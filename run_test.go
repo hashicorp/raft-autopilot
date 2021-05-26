@@ -77,17 +77,13 @@ func TestRunLifeCycle(t *testing.T) {
 
 	var leaderAddr raft.ServerAddress = "198.18.0.1:8300"
 
-	startTime := time.Date(2020, 11, 2, 12, 0, 0, 0, time.UTC)
-	nextStateTime := time.Date(2020, 11, 2, 12, 0, 0, 10000, time.UTC)
-	blockedStartTime := time.Date(2021, 1, 25, 16, 0, 0, 10000, time.UTC)
+	firstStateTime := time.Date(2020, 11, 2, 12, 0, 0, 0, time.UTC)
 
-	mtime.On("Now").Return(startTime).Once()
-	mtime.On("Now").Return(nextStateTime).Once()
-	mtime.On("Now").Return(blockedStartTime).Once()
+	mtime.On("Now").Return(firstStateTime).Once()
 
 	// now validate the initial state
 	expected := &State{
-		startTime:        startTime,
+		firstStateTime:   firstStateTime,
 		Healthy:          true,
 		FailureTolerance: 1,
 		Servers: map[raft.ServerID]*ServerState{
@@ -103,7 +99,7 @@ func TestRunLifeCycle(t *testing.T) {
 				},
 				State:  RaftLeader,
 				Stats:  *serverStats["7875975d-d54b-49c1-a400-9fefcc706c67"],
-				Health: ServerHealth{Healthy: true, StableSince: nextStateTime},
+				Health: ServerHealth{Healthy: true, StableSince: firstStateTime},
 			},
 			"ecfc5237-63c3-4b09-94b9-d5682d9ae5b1": {
 				Server: Server{
@@ -117,7 +113,7 @@ func TestRunLifeCycle(t *testing.T) {
 				},
 				State:  RaftVoter,
 				Stats:  *serverStats["ecfc5237-63c3-4b09-94b9-d5682d9ae5b1"],
-				Health: ServerHealth{Healthy: true, StableSince: nextStateTime},
+				Health: ServerHealth{Healthy: true, StableSince: firstStateTime},
 			},
 			"e72eb8da-604d-47cd-bd7f-69ec120ea2b7": {
 				Server: Server{
@@ -131,7 +127,7 @@ func TestRunLifeCycle(t *testing.T) {
 				},
 				State:  RaftVoter,
 				Stats:  *serverStats["e72eb8da-604d-47cd-bd7f-69ec120ea2b7"],
-				Health: ServerHealth{Healthy: true, StableSince: nextStateTime},
+				Health: ServerHealth{Healthy: true, StableSince: firstStateTime},
 			},
 		},
 		Leader: "7875975d-d54b-49c1-a400-9fefcc706c67",
@@ -166,7 +162,6 @@ func TestRunLifeCycle(t *testing.T) {
 	require.NotNil(t, ap.execution)
 	require.Equal(t, Running, ap.execution.status)
 	require.NotNil(t, ap.execution.shutdown)
-	require.Equal(t, startTime, ap.startTime)
 	require.NotNil(t, ap.execution.done)
 	require.False(t, chanIsSelectable(ap.execution.done))
 	ap.execLock.Unlock()
@@ -194,6 +189,9 @@ func TestRunLifeCycle(t *testing.T) {
 	require.NotNil(t, done)
 	require.True(t, chanIsSelectable(done))
 	require.Equal(t, expected, actual)
+
+	// ensure that stopping caused the state to get erased
+	require.Nil(t, ap.state)
 
 	// simulate shutting down of the previous go routine taking a long time
 	ap.execution = &execInfo{

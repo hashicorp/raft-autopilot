@@ -87,8 +87,8 @@ func TestGatherNextStateInputsLeaderFromDelegate(t *testing.T) {
 	mdel := NewMockApplicationIntegration(t)
 
 	ap := New(mraft, mdel, withTimeProvider(mtime))
-	ap.startTime = time.Date(2020, 11, 2, 12, 0, 0, 0, time.UTC)
-	ap.state = &State{Healthy: false}
+	firstStateTime := time.Date(2020, 11, 2, 12, 0, 0, 0, time.UTC)
+	ap.state = &State{Healthy: false, firstStateTime: firstStateTime}
 
 	now := time.Date(2020, 11, 02, 12, 0, 0, 5000, time.UTC)
 	mtime.On("Now").Return(now).Once()
@@ -158,15 +158,15 @@ func TestGatherNextStateInputsLeaderFromDelegate(t *testing.T) {
 	mdel.On("FetchServerStats", mock.Anything, servers).Return(serverStats).Once()
 
 	expected := &nextStateInputs{
-		Now:          now,
-		StartTime:    ap.startTime,
-		Config:       conf,
-		RaftConfig:   &test3VoterRaftConfiguration,
-		KnownServers: servers,
-		LatestIndex:  lastIndex,
-		LastTerm:     lastTerm,
-		FetchedStats: serverStats,
-		LeaderID:     leaderID,
+		Now:            now,
+		FirstStateTime: firstStateTime,
+		Config:         conf,
+		RaftConfig:     &test3VoterRaftConfiguration,
+		KnownServers:   servers,
+		LatestIndex:    lastIndex,
+		LastTerm:       lastTerm,
+		FetchedStats:   serverStats,
+		LeaderID:       leaderID,
 	}
 
 	actual, err := ap.gatherNextStateInputs(context.Background())
@@ -175,96 +175,120 @@ func TestGatherNextStateInputsLeaderFromDelegate(t *testing.T) {
 }
 
 func TestGatherNextStateInputs(t *testing.T) {
-	mtime := NewMockTimeProvider(t)
-	mraft := NewMockRaft(t)
-	mdel := NewMockApplicationIntegration(t)
-
-	ap := New(mraft, mdel, withTimeProvider(mtime))
-	ap.startTime = time.Date(2020, 11, 2, 12, 0, 0, 0, time.UTC)
-	ap.state = &State{Healthy: false}
-
 	now := time.Date(2020, 11, 02, 12, 0, 0, 5000, time.UTC)
-	mtime.On("Now").Return(now).Once()
 
-	conf := &Config{
-		CleanupDeadServers:      true,
-		LastContactThreshold:    200 * time.Millisecond,
-		MaxTrailingLogs:         200,
-		MinQuorum:               3,
-		ServerStabilizationTime: 10 * time.Second,
+	type testCase struct {
+		state        *State
+		expectedTime time.Time
 	}
 
-	servers := map[raft.ServerID]*Server{
-		"7875975d-d54b-49c1-a400-9fefcc706c67": {
-			ID:          "7875975d-d54b-49c1-a400-9fefcc706c67",
-			Name:        "node1",
-			Address:     "198.18.0.1:8300",
-			NodeStatus:  NodeAlive,
-			Version:     "1.9.0",
-			RaftVersion: 3,
+	cases := map[string]testCase{
+		"nil": {
+			state:        nil,
+			expectedTime: now,
 		},
-		"ecfc5237-63c3-4b09-94b9-d5682d9ae5b1": {
-			ID:          "ecfc5237-63c3-4b09-94b9-d5682d9ae5b1",
-			Name:        "node2",
-			Address:     "198.18.0.2:8300",
-			NodeStatus:  NodeAlive,
-			Version:     "1.9.0",
-			RaftVersion: 3,
+		"zero-time": {
+			state:        &State{},
+			expectedTime: now,
 		},
-		"e72eb8da-604d-47cd-bd7f-69ec120ea2b7": {
-			ID:          "e72eb8da-604d-47cd-bd7f-69ec120ea2b7",
-			Name:        "node3",
-			Address:     "198.18.0.3:8300",
-			NodeStatus:  NodeAlive,
-			Version:     "1.9.0",
-			RaftVersion: 3,
-		},
-	}
-	var lastIndex uint64 = 1024
-	var lastTerm uint64 = 3
-
-	serverStats := map[raft.ServerID]*ServerStats{
-		"7875975d-d54b-49c1-a400-9fefcc706c67": {
-			LastTerm:  lastTerm,
-			LastIndex: lastIndex,
-		},
-		"ecfc5237-63c3-4b09-94b9-d5682d9ae5b1": {
-			LastContact: 10 * time.Millisecond,
-			LastTerm:    lastTerm,
-			LastIndex:   1000,
-		},
-		"e72eb8da-604d-47cd-bd7f-69ec120ea2b7": {
-			LastContact: 15 * time.Millisecond,
-			LastTerm:    lastTerm,
-			LastIndex:   999,
+		"real-time": {
+			state:        &State{firstStateTime: time.Date(2020, 11, 2, 12, 0, 0, 0, time.UTC)},
+			expectedTime: time.Date(2020, 11, 2, 12, 0, 0, 0, time.UTC),
 		},
 	}
 
-	var leaderID raft.ServerID = "7875975d-d54b-49c1-a400-9fefcc706c67"
+	for name, tcase := range cases {
+		t.Run(name, func(t *testing.T) {
+			mtime := NewMockTimeProvider(t)
+			mraft := NewMockRaft(t)
+			mdel := NewMockApplicationIntegration(t)
 
-	mdel.On("AutopilotConfig").Return(conf).Once()
-	mraft.On("GetConfiguration").Return(&raftConfigFuture{config: test3VoterRaftConfiguration}).Once()
-	mdel.On("KnownServers").Return(servers).Once()
-	mraft.On("LastIndex").Return(lastIndex).Once()
-	mraft.On("Stats").Return(map[string]string{"last_log_term": "3"}).Once()
-	mdel.On("FetchServerStats", mock.Anything, servers).Return(serverStats).Once()
-	mraft.On("Leader").Return(raft.ServerAddress("198.18.0.1:8300")).Once()
+			ap := New(mraft, mdel, withTimeProvider(mtime))
+			ap.state = tcase.state
 
-	expected := &nextStateInputs{
-		Now:          now,
-		StartTime:    ap.startTime,
-		Config:       conf,
-		RaftConfig:   &test3VoterRaftConfiguration,
-		KnownServers: servers,
-		LatestIndex:  lastIndex,
-		LastTerm:     lastTerm,
-		FetchedStats: serverStats,
-		LeaderID:     leaderID,
+			mtime.On("Now").Return(now).Once()
+
+			conf := &Config{
+				CleanupDeadServers:      true,
+				LastContactThreshold:    200 * time.Millisecond,
+				MaxTrailingLogs:         200,
+				MinQuorum:               3,
+				ServerStabilizationTime: 10 * time.Second,
+			}
+
+			servers := map[raft.ServerID]*Server{
+				"7875975d-d54b-49c1-a400-9fefcc706c67": {
+					ID:          "7875975d-d54b-49c1-a400-9fefcc706c67",
+					Name:        "node1",
+					Address:     "198.18.0.1:8300",
+					NodeStatus:  NodeAlive,
+					Version:     "1.9.0",
+					RaftVersion: 3,
+				},
+				"ecfc5237-63c3-4b09-94b9-d5682d9ae5b1": {
+					ID:          "ecfc5237-63c3-4b09-94b9-d5682d9ae5b1",
+					Name:        "node2",
+					Address:     "198.18.0.2:8300",
+					NodeStatus:  NodeAlive,
+					Version:     "1.9.0",
+					RaftVersion: 3,
+				},
+				"e72eb8da-604d-47cd-bd7f-69ec120ea2b7": {
+					ID:          "e72eb8da-604d-47cd-bd7f-69ec120ea2b7",
+					Name:        "node3",
+					Address:     "198.18.0.3:8300",
+					NodeStatus:  NodeAlive,
+					Version:     "1.9.0",
+					RaftVersion: 3,
+				},
+			}
+			var lastIndex uint64 = 1024
+			var lastTerm uint64 = 3
+
+			serverStats := map[raft.ServerID]*ServerStats{
+				"7875975d-d54b-49c1-a400-9fefcc706c67": {
+					LastTerm:  lastTerm,
+					LastIndex: lastIndex,
+				},
+				"ecfc5237-63c3-4b09-94b9-d5682d9ae5b1": {
+					LastContact: 10 * time.Millisecond,
+					LastTerm:    lastTerm,
+					LastIndex:   1000,
+				},
+				"e72eb8da-604d-47cd-bd7f-69ec120ea2b7": {
+					LastContact: 15 * time.Millisecond,
+					LastTerm:    lastTerm,
+					LastIndex:   999,
+				},
+			}
+
+			var leaderID raft.ServerID = "7875975d-d54b-49c1-a400-9fefcc706c67"
+
+			mdel.On("AutopilotConfig").Return(conf).Once()
+			mraft.On("GetConfiguration").Return(&raftConfigFuture{config: test3VoterRaftConfiguration}).Once()
+			mdel.On("KnownServers").Return(servers).Once()
+			mraft.On("LastIndex").Return(lastIndex).Once()
+			mraft.On("Stats").Return(map[string]string{"last_log_term": "3"}).Once()
+			mdel.On("FetchServerStats", mock.Anything, servers).Return(serverStats).Once()
+			mraft.On("Leader").Return(raft.ServerAddress("198.18.0.1:8300")).Once()
+
+			expected := &nextStateInputs{
+				Now:            now,
+				FirstStateTime: tcase.expectedTime,
+				Config:         conf,
+				RaftConfig:     &test3VoterRaftConfiguration,
+				KnownServers:   servers,
+				LatestIndex:    lastIndex,
+				LastTerm:       lastTerm,
+				FetchedStats:   serverStats,
+				LeaderID:       leaderID,
+			}
+
+			actual, err := ap.gatherNextStateInputs(context.Background())
+			require.NoError(t, err)
+			require.Equal(t, expected, actual)
+		})
 	}
-
-	actual, err := ap.gatherNextStateInputs(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, expected, actual)
 }
 
 func TestNextStateWithInputs(t *testing.T) {
