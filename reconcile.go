@@ -255,7 +255,7 @@ func (a *Autopilot) pruneDeadServers() error {
 		if voters-1 < int(conf.MinQuorum) {
 			a.logger.Debug("will not remove server as it would leave less voters than the minimum number allowed", "id", id, "min", conf.MinQuorum)
 		} else if maxRemoval < 1 {
-			a.logger.Debug("will not remove server as removal of a majority or servers is not safe", "id", id)
+			a.logger.Debug("will not remove server as removal of a majority of servers is not safe", "id", id)
 		} else if err := a.removeServer(id); err != nil {
 			return err
 		} else {
