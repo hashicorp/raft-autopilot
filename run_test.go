@@ -119,6 +119,7 @@ func TestRunLifeCycle(t *testing.T) {
 						Version:     "1.9.0",
 						RaftVersion: 3,
 						NodeType:    NodeVoter,
+						IsLeader:    true,
 					},
 					State:  RaftLeader,
 					Stats:  *serverStats["7875975d-d54b-49c1-a400-9fefcc706c67"],
@@ -170,6 +171,7 @@ func TestRunLifeCycle(t *testing.T) {
 	mraft.On("GetConfiguration").Return(&raftConfigFuture{config: test3VoterRaftConfiguration}).Times(2)
 	mdel.On("KnownServers").Return(servers).Times(2)
 	mraft.On("LastIndex").Return(lastIndex).Times(2)
+	mraft.On("State").Return(raft.Leader).Times(2)
 	mraft.On("Stats").Return(map[string]string{"last_log_term": "3"}).Times(2)
 	mdel.On("FetchServerStats", mock.Anything, servers).Return(serverStats).Times(2)
 	mraft.On("Leader").Return(leaderAddr).Times(2)

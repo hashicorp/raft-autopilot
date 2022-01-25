@@ -75,6 +75,15 @@ func WithPromoter(promoter Promoter) Option {
 	}
 }
 
+// WithReconciliationDisabled returns an option to initially disable reconciliation
+// for all autopilot go routines. This may be changed in the future with calls to
+// EnableReconciliation and DisableReconciliation.
+func WithReconciliationDisabled() Option {
+	return func(a *Autopilot) {
+		a.DisableReconciliation()
+	}
+}
+
 // ExecutionStatus represents the current status of the autopilot background go routines
 type ExecutionStatus string
 
@@ -151,8 +160,12 @@ type Autopilot struct {
 	// find and remove any dead/failed servers
 	removeDeadCh chan struct{}
 
-	// reconcileCh is used to trigger an immediate round of reconciliation.
-	reconcileCh chan struct{}
+	// reconciliationEnabled controls whether reconciliation is enabled while
+	// autopilot is running
+	reconciliationEnabled bool
+
+	// reconciliationLock synchronizes access to reconciliationEnabled
+	reconciliationLock sync.RWMutex
 
 	// leaderLock implements a cancellable mutex that will be used to ensure
 	// that only one autopilot go routine is the "leader". The leader is
@@ -181,11 +194,12 @@ func New(raft Raft, delegate ApplicationIntegration, options ...Option) *Autopil
 		promoter: DefaultPromoter(),
 		logger:   hclog.Default().Named("autopilot"),
 		// should this be buffered?
-		removeDeadCh:      make(chan struct{}, 1),
-		reconcileInterval: DefaultReconcileInterval,
-		updateInterval:    DefaultUpdateInterval,
-		time:              &runtimeTimeProvider{},
-		leaderLock:        newMutex(),
+		removeDeadCh:          make(chan struct{}, 1),
+		reconciliationEnabled: true,
+		reconcileInterval:     DefaultReconcileInterval,
+		updateInterval:        DefaultUpdateInterval,
+		time:                  &runtimeTimeProvider{},
+		leaderLock:            newMutex(),
 	}
 
 	for _, opt := range options {
@@ -221,4 +235,32 @@ func (a *Autopilot) GetServerHealth(id raft.ServerID) *ServerHealth {
 	}
 
 	return nil
+}
+
+// EnableReconciliation turns on reconciliation for any background go
+// routines that may be running now or in the future.
+func (a *Autopilot) EnableReconciliation() {
+	a.reconciliationLock.Lock()
+	defer a.reconciliationLock.Unlock()
+	if !a.reconciliationEnabled {
+		a.reconciliationEnabled = true
+		a.logger.Info("reconciliation now enabled")
+	}
+}
+
+// DisableReconciliation turns off reconciliation for any background go
+// routines that may be running now or in the future.
+func (a *Autopilot) DisableReconciliation() {
+	a.reconciliationLock.Lock()
+	defer a.reconciliationLock.Unlock()
+	if a.reconciliationEnabled {
+		a.reconciliationEnabled = false
+		a.logger.Info("reconciliation now disabled")
+	}
+}
+
+func (a *Autopilot) ReconciliationEnabled() bool {
+	a.reconciliationLock.RLock()
+	defer a.reconciliationLock.RUnlock()
+	return a.reconciliationEnabled
 }

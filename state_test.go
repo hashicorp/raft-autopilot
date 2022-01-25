@@ -154,6 +154,7 @@ func TestGatherNextStateInputsLeaderFromDelegate(t *testing.T) {
 	mraft.On("GetConfiguration").Return(&raftConfigFuture{config: test3VoterRaftConfiguration}).Once()
 	mdel.On("KnownServers").Return(servers).Once()
 	mraft.On("LastIndex").Return(lastIndex).Once()
+	mraft.On("State").Return(raft.Leader).Once()
 	mraft.On("Stats").Return(map[string]string{"last_log_term": "3"}).Once()
 	mdel.On("FetchServerStats", mock.Anything, servers).Return(serverStats).Once()
 
@@ -167,6 +168,7 @@ func TestGatherNextStateInputsLeaderFromDelegate(t *testing.T) {
 		LastTerm:       lastTerm,
 		FetchedStats:   serverStats,
 		LeaderID:       leaderID,
+		IsLeader:       true,
 	}
 
 	actual, err := ap.gatherNextStateInputs(context.Background())
@@ -180,6 +182,7 @@ func TestGatherNextStateInputs(t *testing.T) {
 	type testCase struct {
 		state        *State
 		expectedTime time.Time
+		noLeader     bool
 	}
 
 	cases := map[string]testCase{
@@ -195,6 +198,11 @@ func TestGatherNextStateInputs(t *testing.T) {
 			state:        &State{firstStateTime: time.Date(2020, 11, 2, 12, 0, 0, 0, time.UTC)},
 			expectedTime: time.Date(2020, 11, 2, 12, 0, 0, 0, time.UTC),
 		},
+		"no-leader": {
+			state:        nil,
+			expectedTime: now,
+			noLeader:     true,
+		},
 	}
 
 	for name, tcase := range cases {
@@ -205,6 +213,18 @@ func TestGatherNextStateInputs(t *testing.T) {
 
 			ap := New(mraft, mdel, withTimeProvider(mtime))
 			ap.state = tcase.state
+
+			var leaderAddress raft.ServerAddress
+			var leaderID raft.ServerID
+			raftState := raft.Leader
+			isLeader := true
+
+			if !tcase.noLeader {
+				leaderAddress = "198.18.0.1:8300"
+				leaderID = "7875975d-d54b-49c1-a400-9fefcc706c67"
+				raftState = raft.Candidate
+				isLeader = false
+			}
 
 			mtime.On("Now").Return(now).Once()
 
@@ -262,15 +282,14 @@ func TestGatherNextStateInputs(t *testing.T) {
 				},
 			}
 
-			var leaderID raft.ServerID = "7875975d-d54b-49c1-a400-9fefcc706c67"
-
 			mdel.On("AutopilotConfig").Return(conf).Once()
 			mraft.On("GetConfiguration").Return(&raftConfigFuture{config: test3VoterRaftConfiguration}).Once()
 			mdel.On("KnownServers").Return(servers).Once()
 			mraft.On("LastIndex").Return(lastIndex).Once()
+			mraft.On("State").Return(raftState).Once()
 			mraft.On("Stats").Return(map[string]string{"last_log_term": "3"}).Once()
 			mdel.On("FetchServerStats", mock.Anything, servers).Return(serverStats).Once()
-			mraft.On("Leader").Return(raft.ServerAddress("198.18.0.1:8300")).Once()
+			mraft.On("Leader").Return(leaderAddress).Once()
 
 			expected := &nextStateInputs{
 				Now:            now,
@@ -282,6 +301,7 @@ func TestGatherNextStateInputs(t *testing.T) {
 				LastTerm:       lastTerm,
 				FetchedStats:   serverStats,
 				LeaderID:       leaderID,
+				IsLeader:       isLeader,
 			}
 
 			actual, err := ap.gatherNextStateInputs(context.Background())
@@ -309,6 +329,30 @@ func TestNextStateWithInputs(t *testing.T) {
 
 	cases := map[string]testCase{
 		"typical": {
+			setupPromoter: func(t *testing.T, m *MockPromoter) {
+				t.Helper()
+				m.On("GetServerExt", mock.AnythingOfType("*autopilot.Config"), mock.AnythingOfType("*autopilot.ServerState")).Return(nil).Times(3)
+				m.On("GetStateExt", mock.AnythingOfType("*autopilot.Config"), mock.AnythingOfType("*autopilot.State")).Return(nil).Once()
+				m.On("GetNodeTypes", mock.AnythingOfType("*autopilot.Config"), mock.AnythingOfType("*autopilot.State")).Return(map[raft.ServerID]NodeType{
+					"7875975d-d54b-49c1-a400-9fefcc706c67": NodeVoter,
+					"ecfc5237-63c3-4b09-94b9-d5682d9ae5b1": NodeVoter,
+					"e72eb8da-604d-47cd-bd7f-69ec120ea2b7": NodeVoter,
+				}).Once()
+			},
+		},
+		"no-leader": {
+			setupPromoter: func(t *testing.T, m *MockPromoter) {
+				t.Helper()
+				m.On("GetServerExt", mock.AnythingOfType("*autopilot.Config"), mock.AnythingOfType("*autopilot.ServerState")).Return(nil).Times(3)
+				m.On("GetStateExt", mock.AnythingOfType("*autopilot.Config"), mock.AnythingOfType("*autopilot.State")).Return(nil).Once()
+				m.On("GetNodeTypes", mock.AnythingOfType("*autopilot.Config"), mock.AnythingOfType("*autopilot.State")).Return(map[raft.ServerID]NodeType{
+					"7875975d-d54b-49c1-a400-9fefcc706c67": NodeVoter,
+					"ecfc5237-63c3-4b09-94b9-d5682d9ae5b1": NodeVoter,
+					"e72eb8da-604d-47cd-bd7f-69ec120ea2b7": NodeVoter,
+				}).Once()
+			},
+		},
+		"not-the-leader": {
 			setupPromoter: func(t *testing.T, m *MockPromoter) {
 				t.Helper()
 				m.On("GetServerExt", mock.AnythingOfType("*autopilot.Config"), mock.AnythingOfType("*autopilot.ServerState")).Return(nil).Times(3)

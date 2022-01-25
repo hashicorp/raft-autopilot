@@ -43,7 +43,7 @@ func mockedRaftAutopilot(t *testing.T) (*Autopilot, *MockRaft) {
 	mdel := NewMockApplicationIntegration(t)
 	mraft := NewMockRaft(t)
 
-	return New(mraft, mdel), mraft
+	return New(mraft, mdel, WithLogger(testLogger(t))), mraft
 }
 
 func TestNumVoters(t *testing.T) {

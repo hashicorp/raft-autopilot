@@ -138,6 +138,20 @@ func (_m *MockRaft) RemoveServer(id raft.ServerID, prevIndex uint64, timeout tim
 	return r0
 }
 
+// State provides a mock function with given fields:
+func (_m *MockRaft) State() raft.RaftState {
+	ret := _m.Called()
+
+	var r0 raft.RaftState
+	if rf, ok := ret.Get(0).(func() raft.RaftState); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(raft.RaftState)
+	}
+
+	return r0
+}
+
 // Stats provides a mock function with given fields:
 func (_m *MockRaft) Stats() map[string]string {
 	ret := _m.Called()
