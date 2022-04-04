@@ -43,19 +43,16 @@ func TestHasVotingRights(t *testing.T) {
 }
 
 func TestServerIsHealthy(t *testing.T) {
-	// these are the settings that are going to be passed into the
-	// isHealthy calls so the testCases should take them into account
-	// for whether the overall expected health should be true/false
-	var lastTerm uint64 = 5
-	var leaderLastIndex uint64 = 1000
 	conf := &Config{
 		MaxTrailingLogs:      200,
 		LastContactThreshold: 100 * time.Millisecond,
 	}
 
 	type testCase struct {
-		server   ServerState
-		expected bool
+		server    ServerState
+		expected  bool
+		lastTerm  uint64
+		lastIndex uint64
 	}
 
 	cases := map[string]testCase{
@@ -64,61 +61,84 @@ func TestServerIsHealthy(t *testing.T) {
 				Server: Server{NodeStatus: NodeAlive},
 				Stats: ServerStats{
 					LastContact: 99 * time.Millisecond,
-					LastTerm:    lastTerm,
+					LastTerm:    5,
 					LastIndex:   801,
 				},
 			},
-			expected: true,
+			lastTerm:  5,
+			lastIndex: 1000,
+			expected:  true,
 		},
 		"node-failed": {
 			server: ServerState{
 				Server: Server{NodeStatus: NodeFailed},
 				Stats: ServerStats{
 					LastContact: 99 * time.Millisecond,
-					LastTerm:    lastTerm,
+					LastTerm:    5,
 					LastIndex:   801,
 				},
 			},
-			expected: false,
+			lastTerm:  5,
+			lastIndex: 1000,
+			expected:  false,
 		},
 		"bad-raft-term": {
 			server: ServerState{
 				Server: Server{NodeStatus: NodeAlive},
 				Stats: ServerStats{
 					LastContact: 99 * time.Millisecond,
-					LastTerm:    lastTerm + 1,
+					LastTerm:    5 + 1,
 					LastIndex:   801,
 				},
 			},
-			expected: false,
+			lastTerm:  5,
+			lastIndex: 1000,
+			expected:  false,
 		},
 		"too-stale": {
 			server: ServerState{
 				Server: Server{NodeStatus: NodeAlive},
 				Stats: ServerStats{
 					LastContact: 150 * time.Millisecond,
-					LastTerm:    lastTerm,
+					LastTerm:    5,
 					LastIndex:   801,
 				},
 			},
-			expected: false,
+			lastTerm:  5,
+			lastIndex: 1000,
+			expected:  false,
 		},
 		"index-too-old": {
 			server: ServerState{
 				Server: Server{NodeStatus: NodeAlive},
 				Stats: ServerStats{
 					LastContact: 99 * time.Millisecond,
-					LastTerm:    lastTerm,
+					LastTerm:    5,
 					LastIndex:   799,
 				},
 			},
-			expected: false,
+			lastTerm:  5,
+			lastIndex: 1000,
+			expected:  false,
+		},
+		"no-leader": {
+			server: ServerState{
+				Server: Server{NodeStatus: NodeAlive},
+				Stats: ServerStats{
+					LastContact: 99 * time.Millisecond,
+					LastTerm:    5,
+					LastIndex:   801,
+				},
+			},
+			lastTerm:  0,
+			lastIndex: 0,
+			expected:  false,
 		},
 	}
 
 	for name, tcase := range cases {
 		t.Run(name, func(t *testing.T) {
-			require.Equal(t, tcase.expected, tcase.server.isHealthy(lastTerm, leaderLastIndex, conf))
+			require.Equal(t, tcase.expected, tcase.server.isHealthy(tcase.lastTerm, tcase.lastIndex, conf))
 		})
 	}
 }

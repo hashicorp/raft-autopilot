@@ -36,6 +36,7 @@ type nextStateInputs struct {
 	LastTerm       uint64
 	FetchedStats   map[raft.ServerID]*ServerStats
 	LeaderID       raft.ServerID
+	IsLeader       bool // this will be true when the server running the autopilot code is the leader
 }
 
 // gatherNextStateInputs gathers all the information that would be used to
@@ -117,9 +118,6 @@ func (a *Autopilot) gatherNextStateInputs(ctx context.Context) (*nextStateInputs
 				break
 			}
 		}
-		if inputs.LeaderID == "" {
-			return nil, fmt.Errorf("cannot detect the current leader server id from its address: %s", leader)
-		}
 	}
 
 	// get the latest Raft index - this should be kept close to the call to
@@ -127,6 +125,10 @@ func (a *Autopilot) gatherNextStateInputs(ctx context.Context) (*nextStateInputs
 	// possible to make the best decision regarding an individual servers
 	// healthiness.
 	inputs.LatestIndex = a.raft.LastIndex()
+	// our latest index will be used to determine other server healthiness
+	// if we are the leader. If not then we will attempt to determine the
+	// latest index of the leader and use that.
+	inputs.IsLeader = a.raft.State() == raft.Leader
 
 	term, err := a.lastTerm()
 	if err != nil {
@@ -172,9 +174,6 @@ func (a *Autopilot) nextState(ctx context.Context) (*State, error) {
 	}
 
 	state := a.nextStateWithInputs(inputs)
-	if state.Leader == "" {
-		return nil, fmt.Errorf("Unabled to detect the leader server")
-	}
 	return state, nil
 }
 
@@ -308,12 +307,6 @@ func (a *Autopilot) buildServerState(inputs *nextStateInputs, srv raft.Server) S
 		state.State = RaftNone
 	}
 
-	// overwrite the raft state to mark the leader as such instead of just
-	// a regular voter
-	if srv.ID == inputs.LeaderID {
-		state.State = RaftLeader
-	}
-
 	var previousHealthy *bool
 
 	a.stateLock.RLock()
@@ -348,13 +341,32 @@ func (a *Autopilot) buildServerState(inputs *nextStateInputs, srv raft.Server) S
 		state.Server.NodeStatus = NodeLeft
 	}
 
+	// overwrite the raft state to mark the leader as such instead of just
+	// a regular voter
+	if srv.ID == inputs.LeaderID {
+		state.State = RaftLeader
+		state.Server.IsLeader = true
+	}
+
 	// override the Stats if any where in the fetched results
 	if stats, found := inputs.FetchedStats[srv.ID]; found {
 		state.Stats = *stats
 	}
 
+	var leaderLastIndex uint64
+	var leaderLastTerm uint64
+
+	// determine what term/index the leader is on for use in health calculations
+	if inputs.IsLeader {
+		leaderLastIndex = inputs.LatestIndex
+		leaderLastTerm = inputs.LastTerm
+	} else if leader, ok := inputs.FetchedStats[inputs.LeaderID]; ok {
+		leaderLastIndex = leader.LastIndex
+		leaderLastTerm = leader.LastTerm
+	} // else - we have no leader and will keep the term/index at 0 to indicate this
+
 	// now populate the healthy field given the stats
-	state.Health.Healthy = state.isHealthy(inputs.LastTerm, inputs.LatestIndex, inputs.Config)
+	state.Health.Healthy = state.isHealthy(leaderLastTerm, leaderLastIndex, inputs.Config)
 	// overwrite the StableSince field if this is a new server or when
 	// the health status changes. No need for an else as we previously set
 	// it when we overwrote the whole Health structure when finding a

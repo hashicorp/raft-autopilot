@@ -9,6 +9,10 @@ import (
 
 // reconcile calculates and then applies promotions and demotions
 func (a *Autopilot) reconcile() error {
+	if !a.ReconciliationEnabled() {
+		return nil
+	}
+
 	conf := a.delegate.AutopilotConfig()
 	if conf == nil {
 		return nil
@@ -221,6 +225,10 @@ func (a *Autopilot) getFailedServers() (*FailedServers, int, error) {
 // Additionally the delegate will be consulted to determine if all of the removals should be done and
 // can filter the failed servers listings if need be.
 func (a *Autopilot) pruneDeadServers() error {
+	if !a.ReconciliationEnabled() {
+		return nil
+	}
+
 	conf := a.delegate.AutopilotConfig()
 	if conf == nil || !conf.CleanupDeadServers {
 		return nil

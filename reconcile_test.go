@@ -318,7 +318,7 @@ func TestReconcile(t *testing.T) {
 					// already a non-voter so nothing should be done
 					"0a79bbf7-7113-4947-a257-6179326f188c",
 				},
-				// no leader ship transfer should be done because we did demotions
+				// should transfer leadership because no demotions actually needed performing
 				Leader: "1f07052e-53c7-4f99-9cb6-6bb5b39ce8a8",
 			},
 			setupExpectations: func(m *MockRaft) {
@@ -340,11 +340,12 @@ func TestReconcile(t *testing.T) {
 			mraft := NewMockRaft(t)
 
 			a := &Autopilot{
-				logger:   hclog.NewNullLogger(),
-				raft:     mraft,
-				delegate: mapp,
-				state:    &tcase.state,
-				promoter: mpromoter,
+				logger:                hclog.NewNullLogger(),
+				raft:                  mraft,
+				delegate:              mapp,
+				state:                 &tcase.state,
+				promoter:              mpromoter,
+				reconciliationEnabled: true,
 			}
 
 			if tcase.setupExpectations != nil {
@@ -728,11 +729,12 @@ func TestPruneDeadServers(t *testing.T) {
 			mraft.On("GetConfiguration").Return(&raftConfigFuture{config: tcase.raftConfig}).Once()
 
 			a := &Autopilot{
-				logger:   hclog.NewNullLogger(),
-				raft:     mraft,
-				delegate: mapp,
-				state:    &tcase.state,
-				promoter: mpromoter,
+				logger:                hclog.NewNullLogger(),
+				raft:                  mraft,
+				delegate:              mapp,
+				state:                 &tcase.state,
+				promoter:              mpromoter,
+				reconciliationEnabled: true,
 			}
 
 			if tcase.setupExpectations != nil {
@@ -743,4 +745,18 @@ func TestPruneDeadServers(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func TestReconcileDisabled(t *testing.T) {
+	ap := New(NewMockRaft(t), NewMockApplicationIntegration(t),
+		WithLogger(testLogger(t)),
+		WithReconciliationDisabled())
+	require.NoError(t, ap.reconcile())
+}
+
+func TestPruneDeadServersDisabled(t *testing.T) {
+	ap := New(NewMockRaft(t), NewMockApplicationIntegration(t),
+		WithLogger(testLogger(t)),
+		WithReconciliationDisabled())
+	require.NoError(t, ap.pruneDeadServers())
 }
