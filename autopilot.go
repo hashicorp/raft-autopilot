@@ -52,11 +52,11 @@ func WithLogger(logger hclog.Logger) Option {
 	}
 }
 
-// withTimeProvider returns an Option which overrides and Autopilot instance's
+// WithTimeProvider returns an Option which overrides and Autopilot instance's
 // time provider with the given one. This should only be used in tests
 // as a means of making some time.Time values in an autopilot state deterministic.
 // For real uses the default runtimeTimeProvider should be used.
-func withTimeProvider(provider timeProvider) Option {
+func WithTimeProvider(provider TimeProvider) Option {
 	return func(a *Autopilot) {
 		a.time = provider
 	}
@@ -134,7 +134,7 @@ type Autopilot struct {
 	// deterministic but for running systems this should not be overrided from the
 	// default which is the runtimeTimeProvider and is a small shim around calling
 	// time.Now.
-	time timeProvider
+	time TimeProvider
 
 	// reconcileInterval is how long between rounds of performing promotions, demotions
 	// and leadership transfers.

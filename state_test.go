@@ -86,7 +86,7 @@ func TestGatherNextStateInputsLeaderFromDelegate(t *testing.T) {
 	mraft := NewMockRaft(t)
 	mdel := NewMockApplicationIntegration(t)
 
-	ap := New(mraft, mdel, withTimeProvider(mtime))
+	ap := New(mraft, mdel, WithTimeProvider(mtime))
 	firstStateTime := time.Date(2020, 11, 2, 12, 0, 0, 0, time.UTC)
 	ap.state = &State{Healthy: false, firstStateTime: firstStateTime}
 
@@ -211,7 +211,7 @@ func TestGatherNextStateInputs(t *testing.T) {
 			mraft := NewMockRaft(t)
 			mdel := NewMockApplicationIntegration(t)
 
-			ap := New(mraft, mdel, withTimeProvider(mtime))
+			ap := New(mraft, mdel, WithTimeProvider(mtime))
 			ap.state = tcase.state
 
 			var leaderAddress raft.ServerAddress
