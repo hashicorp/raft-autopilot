@@ -8,7 +8,7 @@
       "MinQuorum": 3,
       "ServerStabilizationTime": 10000000000
    },
-   "State": {
+   "CurrentState": {
       "Healthy": true,
       "FailureTolerance": 1,
       "Servers": {

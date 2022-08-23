@@ -40,6 +40,19 @@ type nextStateInputs struct {
 	CurrentState   *State
 }
 
+func (i *nextStateInputs) getCurrentServerState(id raft.ServerID) (*ServerState, bool) {
+	if i.CurrentState == nil {
+		return nil, false
+	}
+
+	if i.CurrentState.Servers == nil {
+		return nil, false
+	}
+
+	srv, found := i.CurrentState.Servers[id]
+	return srv, found
+}
+
 // gatherNextStateInputs gathers all the information that would be used to
 // create the new updated state from.
 //
@@ -322,7 +335,7 @@ func buildServerState(inputs *nextStateInputs, srv raft.Server) ServerState {
 
 	// copy some state from an existing server into the new state - most of this
 	// should be overridden soon but at this point we are just building the base.
-	if existing, found := inputs.CurrentState.Servers[srv.ID]; found {
+	if existing, found := inputs.getCurrentServerState(srv.ID); found {
 		state.Stats = existing.Stats
 		state.Health = existing.Health
 		previousHealthy = &state.Health.Healthy

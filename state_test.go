@@ -169,6 +169,7 @@ func TestGatherNextStateInputsLeaderFromDelegate(t *testing.T) {
 		FetchedStats:   serverStats,
 		LeaderID:       leaderID,
 		IsLeader:       true,
+		CurrentState:   ap.state,
 	}
 
 	actual, err := ap.gatherNextStateInputs(context.Background())
@@ -302,6 +303,7 @@ func TestGatherNextStateInputs(t *testing.T) {
 				FetchedStats:   serverStats,
 				LeaderID:       leaderID,
 				IsLeader:       isLeader,
+				CurrentState:   tcase.state,
 			}
 
 			actual, err := ap.gatherNextStateInputs(context.Background())
@@ -324,7 +326,7 @@ func TestNextStateWithInputs(t *testing.T) {
 
 	type testCase struct {
 		setupPromoter func(*testing.T, *MockPromoter)
-		setupState    func(*testing.T, *State)
+		// setupState    func(*testing.T, *State)
 	}
 
 	cases := map[string]testCase{
@@ -411,22 +413,6 @@ func TestNextStateWithInputs(t *testing.T) {
 					"e72eb8da-604d-47cd-bd7f-69ec120ea2b7": NodeVoter,
 				}).Once()
 			},
-			setupState: func(_ *testing.T, state *State) {
-				state.Servers = map[raft.ServerID]*ServerState{
-					"e72eb8da-604d-47cd-bd7f-69ec120ea2b7": {
-						Server: Server{},
-						State:  "voter",
-						Stats: ServerStats{
-							LastContact: 15000000,
-							LastIndex:   999,
-							LastTerm:    3,
-						},
-						Health: ServerHealth{
-							StableSince: time.Date(2020, 11, 2, 15, 0, 0, 0, time.UTC),
-						},
-					},
-				}
-			},
 		},
 	}
 
@@ -447,9 +433,6 @@ func TestNextStateWithInputs(t *testing.T) {
 
 			// we have to create this to use the promoter
 			ap := New(mraft, mdel, WithPromoter(mprom))
-			if tcase.setupState != nil {
-				tcase.setupState(t, ap.state)
-			}
 
 			state := ap.nextStateWithInputs(&inputs)
 			actualBytes, err := json.MarshalIndent(state, "", "   ")
