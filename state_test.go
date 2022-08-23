@@ -326,7 +326,6 @@ func TestNextStateWithInputs(t *testing.T) {
 
 	type testCase struct {
 		setupPromoter func(*testing.T, *MockPromoter)
-		// setupState    func(*testing.T, *State)
 	}
 
 	cases := map[string]testCase{

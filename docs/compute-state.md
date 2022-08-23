@@ -18,8 +18,8 @@ State computation relies heavily on external interface implementations:
 
 * `TimeProvider` - Something that has a `Now` method which can be invoked to provide the current time. In tests this can be mocked to allow for stable test output. In production this should almost certainly be left unset and allowed to default to the implementation which uses the stdlib `time.Now()` function.
 * `Application` - This is the program/application that is using the raft-autopilot library (e.g. Consul or Vault). The input gathering phase relies on the following methods on the interface:
-   * `AutopilotConfig`
-   * `KnownServers` 
+   * `AutopilotConfig` - We get the autopilot configuration so that we can know which features are enabled and how to determine healthiness.
+   * `KnownServers` - The application is responsible for giving us a list of nodes that it thinks should be servers currently.
    * `FetchServerStats` - the servers Autopilot requests the application get stats for are only servers returned by the `KnownServers` call that are reported as alive.
 * `Raft` - The Raft interface _should_ always be a real `Raft` from github.com/hashicorp/raft when run in production. For tests, it is convenient to be able to mock out Raft and force it to return specific information without actually needing to run the Raft algorithms. Autopilot relies on the following Raft methods:
    * `GetConfiguration` - Autopilot will get the Raft configuration so that it can reconcile the `Applications` view of the servers as reported by `KnownServers` with `Rafts` current view. Eventually the computed state with information about a servers current suffrage will be used to make decisions regarding promotions and demotions.
