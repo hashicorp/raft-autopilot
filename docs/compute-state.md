@@ -12,7 +12,7 @@ State computation happens automatically when Autopilot is running. The process h
 * Input Gathering 
 * State Building
 
-During the input gathering phase Autopilot will gather all the inputs it will need to build the state. Then those inputs are consumed in the state building phase to actually put together the current `State`. Things are structured in this manner to allower for better unit testing of the state building. The library tests can provide known inputs and verify that the state is built correctly without having to setup mocks for how that data is retrieved. Similarly we can setup the mocks and assert that the correct set of inputs are gathered correctly without having to infer that they were from the final built state.
+During the input gathering phase Autopilot will gather all the inputs it will need to build the state. Then those inputs are consumed in the state building phase to actually put together the current `State`. Things are structured in this manner to allow for better unit testing of the state building. The library tests can provide known inputs and verify that the state is built correctly without having to setup mocks for how that data is retrieved. Similarly we can setup the mocks and assert that the correct set of inputs are gathered correctly without having to infer that they were from the final built state.
 
 State computation relies heavily on external interface implementations:
 
