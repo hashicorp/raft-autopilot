@@ -19,9 +19,7 @@ func (a *Autopilot) reconcile() error {
 	}
 
 	// grab the current state while locked
-	a.stateLock.Lock()
-	state := a.state
-	a.stateLock.Unlock()
+	state := a.GetState()
 
 	if state == nil || state.Leader == "" {
 		return fmt.Errorf("Cannote reconcile Raft server voting rights without a valid autopilot state")

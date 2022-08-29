@@ -80,10 +80,7 @@ func (a *Autopilot) gatherNextStateInputs(ctx context.Context) (*nextStateInputs
 	// time a state was generated so we know if we have a state old enough where there is
 	// any chance of seeing servers as stable based off that configured threshold.
 	var firstStateTime time.Time
-	var currentState *State
-	a.stateLock.Lock()
-	currentState = a.state
-	a.stateLock.Unlock()
+	currentState := a.GetState()
 	if currentState != nil {
 		firstStateTime = a.state.firstStateTime
 	}

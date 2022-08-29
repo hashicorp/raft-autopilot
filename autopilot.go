@@ -219,8 +219,8 @@ func (a *Autopilot) RemoveDeadServers() {
 
 // GetState retrieves the current autopilot State
 func (a *Autopilot) GetState() *State {
-	a.stateLock.Lock()
-	defer a.stateLock.Unlock()
+	a.stateLock.RLock()
+	defer a.stateLock.RUnlock()
 	return a.state
 }
 
