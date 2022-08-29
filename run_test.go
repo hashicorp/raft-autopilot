@@ -181,7 +181,7 @@ func TestRunLifeCycle(t *testing.T) {
 	ap := New(mraft, mdel,
 		WithReconcileInterval(30*time.Second),
 		WithUpdateInterval(30*time.Second),
-		withTimeProvider(mtime),
+		WithTimeProvider(mtime),
 		WithLogger(testLogger(t)),
 	)
 

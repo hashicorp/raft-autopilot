@@ -37,19 +37,33 @@ type nextStateInputs struct {
 	FetchedStats   map[raft.ServerID]*ServerStats
 	LeaderID       raft.ServerID
 	IsLeader       bool // this will be true when the server running the autopilot code is the leader
+	CurrentState   *State
+}
+
+func (i *nextStateInputs) getCurrentServerState(id raft.ServerID) (*ServerState, bool) {
+	if i.CurrentState == nil {
+		return nil, false
+	}
+
+	if i.CurrentState.Servers == nil {
+		return nil, false
+	}
+
+	srv, found := i.CurrentState.Servers[id]
+	return srv, found
 }
 
 // gatherNextStateInputs gathers all the information that would be used to
 // create the new updated state from.
 //
-// - Time Providers current time.
-// - Autopilot Config (needed to determine if the stats should indicate unhealthiness)
-// - Current state
-// - Raft Configuration
-// - Known Servers
-// - Latest raft index (gathered right before the remote server stats so that they should
-//   be from about the same point in time)
-// - Stats for all non-left servers
+//   - Time Providers current time.
+//   - Autopilot Config (needed to determine if the stats should indicate unhealthiness)
+//   - Current state
+//   - Raft Configuration
+//   - Known Servers
+//   - Latest raft index (gathered right before the remote server stats so that they should
+//     be from about the same point in time)
+//   - Stats for all non-left servers
 func (a *Autopilot) gatherNextStateInputs(ctx context.Context) (*nextStateInputs, error) {
 	// there are a lot of inputs to computing the next state so they get put into a
 	// struct so that we don't have to return 8 values.
@@ -66,11 +80,10 @@ func (a *Autopilot) gatherNextStateInputs(ctx context.Context) (*nextStateInputs
 	// time a state was generated so we know if we have a state old enough where there is
 	// any chance of seeing servers as stable based off that configured threshold.
 	var firstStateTime time.Time
-	a.stateLock.Lock()
-	if a.state != nil {
+	currentState := a.GetState()
+	if currentState != nil {
 		firstStateTime = a.state.firstStateTime
 	}
-	a.stateLock.Unlock()
 
 	// firstStateTime will be the zero value if we are in the process of generating
 	// the first state. In that case we set it to the now time.
@@ -81,6 +94,7 @@ func (a *Autopilot) gatherNextStateInputs(ctx context.Context) (*nextStateInputs
 	inputs := &nextStateInputs{
 		Now:            now,
 		FirstStateTime: firstStateTime,
+		CurrentState:   currentState,
 	}
 
 	// grab the latest autopilot configuration
@@ -177,6 +191,13 @@ func (a *Autopilot) nextState(ctx context.Context) (*State, error) {
 	return state, nil
 }
 
+// ComputeState will compute a new state via the normal means but will not retain it
+// internally. This functions main purpose is to help with testing promoter and
+// application integration interface implementations.
+func (a *Autopilot) ComputeState(ctx context.Context) (*State, error) {
+	return a.nextState(ctx)
+}
+
 // nextStateWithInputs computes the next state given pre-gathered inputs
 func (a *Autopilot) nextStateWithInputs(inputs *nextStateInputs) *State {
 	nextServers := a.nextServers(inputs)
@@ -260,7 +281,7 @@ func (a *Autopilot) nextServers(inputs *nextStateInputs) map[raft.ServerID]*Serv
 	newServers := make(map[raft.ServerID]*ServerState)
 
 	for _, srv := range inputs.RaftConfig.Servers {
-		state := a.buildServerState(inputs, srv)
+		state := buildServerState(inputs, srv)
 
 		// update any promoter specific information. This isn't done within
 		// buildServerState to keep that function "pure" and not require
@@ -278,7 +299,7 @@ func (a *Autopilot) nextServers(inputs *nextStateInputs) map[raft.ServerID]*Serv
 // buildServerState takes all the nextStateInputs and builds out a ServerState
 // for the given Raft server. This will take into account the raft configuration
 // existing state, application known servers and recently fetched stats.
-func (a *Autopilot) buildServerState(inputs *nextStateInputs, srv raft.Server) ServerState {
+func buildServerState(inputs *nextStateInputs, srv raft.Server) ServerState {
 	// Note that the ordering of operations in this method are very important.
 	// We are building up the ServerState from the least important sources
 	// and overriding them with more up to date values.
@@ -309,10 +330,9 @@ func (a *Autopilot) buildServerState(inputs *nextStateInputs, srv raft.Server) S
 
 	var previousHealthy *bool
 
-	a.stateLock.RLock()
 	// copy some state from an existing server into the new state - most of this
 	// should be overridden soon but at this point we are just building the base.
-	if existing, found := a.state.Servers[srv.ID]; found {
+	if existing, found := inputs.getCurrentServerState(srv.ID); found {
 		state.Stats = existing.Stats
 		state.Health = existing.Health
 		previousHealthy = &state.Health.Healthy
@@ -324,7 +344,6 @@ func (a *Autopilot) buildServerState(inputs *nextStateInputs, srv raft.Server) S
 		state.Server = existing.Server
 		state.Server.Address = srv.Address
 	}
-	a.stateLock.RUnlock()
 
 	// pull in the latest information from the applications knowledge of the
 	// server. Mainly we want the NodeStatus & Meta

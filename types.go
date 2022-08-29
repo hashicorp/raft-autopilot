@@ -7,7 +7,7 @@ import (
 	"github.com/hashicorp/raft"
 )
 
-//go:generate mockery -all -inpkg -case snake -testonly
+//go:generate mockery --all --case snake --inpackage
 
 // RaftState is the status of a single server in the Raft cluster.
 type RaftState string
@@ -293,9 +293,9 @@ type Promoter interface {
 	FilterFailedServerRemovals(*Config, *State, *FailedServers) *FailedServers
 }
 
-// timeProvider is an interface for getting a local time. This is mainly useful for testing
+// TimeProvider is an interface for getting a local time. This is mainly useful for testing
 // to inject certain times so that output validation is easier.
-type timeProvider interface {
+type TimeProvider interface {
 	Now() time.Time
 }
 
