@@ -404,7 +404,7 @@ func TestPruneDeadServers(t *testing.T) {
 						ID:       "0aacc844-1d0a-4ba7-bbc2-bd88d51cb231",
 						Address:  "198.18.0.5:8300",
 					},
-					// this is going to be our failed non voter
+					// this is going to be our failed non-voter
 					{
 						Suffrage: raft.Nonvoter,
 						ID:       "8830c599-04cc-4b28-9b75-173355d49ab1",
@@ -498,17 +498,34 @@ func TestPruneDeadServers(t *testing.T) {
 							NodeStatus: NodeFailed,
 						},
 					},
+					// Failed non-voter
 					"8830c599-04cc-4b28-9b75-173355d49ab1": {
 						Server: Server{
 							ID:         "8830c599-04cc-4b28-9b75-173355d49ab1",
 							Name:       "node6",
 							Address:    "198.18.0.6:8300",
 							NodeStatus: NodeFailed,
+						}, Health: ServerHealth{
+							Healthy:     false,
+							StableSince: time.Now().Add(-time.Hour * 3),
+						},
+					},
+					// Stale non-voter
+					"db877f23-3e0a-4107-8ed8-bd7c3d710944": {
+						Server: Server{
+							ID:         "db877f23-3e0a-4107-8ed8-bd7c3d710944",
+							Name:       "node4",
+							Address:    "198.18.0.4:8300",
+							NodeStatus: NodeLeft,
+						}, Health: ServerHealth{
+							Healthy:     false,
+							StableSince: time.Now().Add(-time.Hour * 3),
 						},
 					},
 				},
 			},
 			setupExpectations: func(mraft *MockRaft, mapp *MockApplicationIntegration) {
+				// Stale non-voter
 				mraft.On("RemoveServer",
 					raft.ServerID("db877f23-3e0a-4107-8ed8-bd7c3d710944"),
 					uint64(0),
@@ -519,6 +536,7 @@ func TestPruneDeadServers(t *testing.T) {
 					uint64(0),
 					time.Duration(0),
 				).Return(&raftIndexFuture{}).Once()
+				// Failed non-voter
 				mapp.On("RemoveFailedServer", &Server{
 					ID:         "8830c599-04cc-4b28-9b75-173355d49ab1",
 					Name:       "node6",
@@ -709,20 +727,185 @@ func TestPruneDeadServers(t *testing.T) {
 				}).Once()
 			},
 		},
+		"ignore-stabilizing-nodes": {
+			raftConfig: raft.Configuration{
+				Servers: []raft.Server{
+					{
+						Suffrage: raft.Voter,
+						ID:       "51b2d56e-816e-409a-8b8e-afef2cf49661",
+						Address:  "198.18.0.1:8300",
+					},
+					{
+						Suffrage: raft.Voter,
+						ID:       "51fb4248-be6a-43e5-b47f-c089818e2012",
+						Address:  "198.18.0.2:8300",
+					},
+					{
+						Suffrage: raft.Voter,
+						ID:       "a227f9a9-f55e-4321-b959-5afdcc63c6d3",
+						Address:  "198.18.0.3:8300",
+					},
+					// this is going to be our stale non-voter
+					// (it won't be known to the delegate that supplies 'KnownServers'
+					{
+						Suffrage: raft.Nonvoter,
+						ID:       "db877f23-3e0a-4107-8ed8-bd7c3d710944",
+						Address:  "198.18.0.4:8300",
+					},
+					// this is going to be our failed non-voter
+					{
+						Suffrage: raft.Nonvoter,
+						ID:       "8830c599-04cc-4b28-9b75-173355d49ab5",
+						Address:  "198.18.0.5:8300",
+					},
+				},
+			},
+			expectedFailed: FailedServers{
+				StaleNonVoters: []raft.ServerID{"db877f23-3e0a-4107-8ed8-bd7c3d710944"},
+				FailedNonVoters: []*Server{
+					{
+						ID:         "8830c599-04cc-4b28-9b75-173355d49ab5",
+						Name:       "node5",
+						Address:    "198.18.0.5:8300",
+						NodeStatus: NodeFailed,
+						NodeType:   NodeVoter,
+					},
+				},
+			},
+			knownServers: map[raft.ServerID]*Server{
+				"51b2d56e-816e-409a-8b8e-afef2cf49661": {
+					ID:         "51b2d56e-816e-409a-8b8e-afef2cf49661",
+					Name:       "node1",
+					Address:    "198.18.0.1:8300",
+					NodeStatus: NodeAlive,
+					NodeType:   NodeVoter,
+				},
+				"51fb4248-be6a-43e5-b47f-c089818e2012": {
+					ID:         "51fb4248-be6a-43e5-b47f-c089818e2012",
+					Name:       "node2",
+					Address:    "198.18.0.2:8300",
+					NodeStatus: NodeAlive,
+					NodeType:   NodeVoter,
+				},
+				"a227f9a9-f55e-4321-b959-5afdcc63c6d3": {
+					ID:         "a227f9a9-f55e-4321-b959-5afdcc63c6d3",
+					Name:       "node3",
+					Address:    "198.18.0.3:8300",
+					NodeStatus: NodeAlive,
+					NodeType:   NodeVoter,
+				},
+				"8830c599-04cc-4b28-9b75-173355d49ab5": {
+					ID:         "8830c599-04cc-4b28-9b75-173355d49ab5",
+					Name:       "node5",
+					Address:    "198.18.0.5:8300",
+					NodeStatus: NodeFailed,
+					NodeType:   NodeVoter,
+				},
+			},
+			state: State{
+				Servers: map[raft.ServerID]*ServerState{
+					"51b2d56e-816e-409a-8b8e-afef2cf49661": {
+						Server: Server{
+							ID:         "51b2d56e-816e-409a-8b8e-afef2cf49661",
+							Name:       "node1",
+							Address:    "198.18.0.1:8300",
+							NodeStatus: NodeAlive,
+							NodeType:   NodeVoter,
+						}, State: RaftVoter,
+					},
+					"51fb4248-be6a-43e5-b47f-c089818e2012": {
+						Server: Server{
+							ID:         "51fb4248-be6a-43e5-b47f-c089818e2012",
+							Name:       "node2",
+							Address:    "198.18.0.2:8300",
+							NodeStatus: NodeAlive,
+							NodeType:   NodeVoter,
+						}, State: RaftVoter,
+					},
+					"a227f9a9-f55e-4321-b959-5afdcc63c6d3": {
+						Server: Server{
+							ID:         "a227f9a9-f55e-4321-b959-5afdcc63c6d3",
+							Name:       "node3",
+							Address:    "198.18.0.3:8300",
+							NodeStatus: NodeAlive,
+							NodeType:   NodeVoter,
+						}, State: RaftVoter,
+					},
+					// Stale non-voter
+					"db877f23-3e0a-4107-8ed8-bd7c3d710944": {
+						Server: Server{
+							ID:         "db877f23-3e0a-4107-8ed8-bd7c3d710944",
+							Name:       "node4",
+							Address:    "198.18.0.4:8300",
+							NodeStatus: NodeLeft,
+							NodeType:   NodeVoter,
+						}, State: RaftNonVoter,
+						Health: ServerHealth{
+							Healthy:     false,
+							StableSince: time.Now(),
+						},
+					},
+					// Failed non-voter
+					"8830c599-04cc-4b28-9b75-173355d49ab5": {
+						Server: Server{
+							ID:         "8830c599-04cc-4b28-9b75-173355d49ab5",
+							Name:       "node5",
+							Address:    "198.18.0.5:8300",
+							NodeStatus: NodeFailed,
+							NodeType:   NodeVoter,
+						}, State: RaftNonVoter,
+						Health: ServerHealth{
+							Healthy:     false,
+							StableSince: time.Now(),
+						},
+					},
+				},
+			},
+			setupExpectations: func(mraft *MockRaft, mapp *MockApplicationIntegration) {
+				// Stale non-voter
+				mraft.On("RemoveServer",
+					raft.ServerID("db877f23-3e0a-4107-8ed8-bd7c3d710944"),
+					uint64(0),
+					time.Duration(0),
+				).Return(&raftIndexFuture{}).Once()
+				//mraft.On("RemoveServer",
+				//	raft.ServerID("0aacc844-1d0a-4ba7-bbc2-bd88d51cb231"),
+				//	uint64(0),
+				//	time.Duration(0),
+				//).Return(&raftIndexFuture{}).Once()
+				// Failed non-voter
+				//mapp.On("RemoveFailedServer", &Server{
+				//	ID:         "8830c599-04cc-4b28-9b75-173355d49ab1",
+				//	Name:       "node6",
+				//	Address:    "198.18.0.6:8300",
+				//	NodeStatus: NodeFailed,
+				//}).Once()
+				//mapp.On("RemoveFailedServer", &Server{
+				//	ID:         "3857f1d4-5c23-4016-9078-fee502c0d1be",
+				//	Name:       "node3",
+				//	Address:    "198.18.0.3:8300",
+				//	NodeStatus: NodeFailed,
+				//	NodeType:   NodeVoter,
+				//}).Once()
+			},
+		},
 	}
 
 	for name, tcase := range cases {
+		name := name
+		tcase := tcase
 		t.Run(name, func(t *testing.T) {
 			conf := &Config{
-				CleanupDeadServers: true,
-				MinQuorum:          3,
+				CleanupDeadServers:      true,
+				MinQuorum:               3,
+				ServerStabilizationTime: time.Hour * 6,
 			}
 			mpromoter := NewMockPromoter(t)
 			mpromoter.On("FilterFailedServerRemovals", conf, &tcase.state, &tcase.expectedFailed).Return(&tcase.expectedFailed).Once()
 
 			mapp := NewMockApplicationIntegration(t)
 			mapp.On("AutopilotConfig").Return(conf).Once()
-			mapp.On("KnownServers").Return(tcase.knownServers).Once()
+			mapp.On("KnownServers").Return(tcase.knownServers)
 
 			mraft := NewMockRaft(t)
 
@@ -735,6 +918,7 @@ func TestPruneDeadServers(t *testing.T) {
 				state:                 &tcase.state,
 				promoter:              mpromoter,
 				reconciliationEnabled: true,
+				time:                  &runtimeTimeProvider{},
 			}
 
 			if tcase.setupExpectations != nil {

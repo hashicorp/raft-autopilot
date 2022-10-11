@@ -241,27 +241,36 @@ func (a *Autopilot) pruneDeadServers() error {
 
 	failed = a.promoter.FilterFailedServerRemovals(conf, state, failed)
 
-	// remove failed non voting servers
+	// Decide whether to remove failed non-voters
 	for _, srv := range failed.FailedNonVoters {
-		a.logger.Info("Attempting removal of failed server node", "id", srv.ID, "name", srv.Name, "address", srv.Address)
-		a.delegate.RemoveFailedServer(srv)
+		h := a.GetServerHealth(srv.ID)
+		if h != nil && !h.IsStable(a.time.Now(), conf.ServerStabilizationTime) && srv.NodeType == NodeVoter {
+			a.logger.Debug("will not remove failed non-voting server node, as it has not passed stabilization time and is desired to become a voter", "id", srv.ID)
+		} else {
+			a.logger.Info("Attempting removal of failed non-voting server node", "id", srv.ID, "name", srv.Name, "address", srv.Address)
+			a.delegate.RemoveFailedServer(srv)
+		}
 	}
 
-	// remove stale non voters
+	// Decide whether to remove stale non-voters
 	for _, id := range failed.StaleNonVoters {
-		a.logger.Debug("removing stale raft server from configuration", "id", id)
-		if err := a.removeServer(id); err != nil {
+		h := a.GetServerHealth(id)
+		if srv, found := a.delegate.KnownServers()[id]; found && h != nil && !h.IsStable(a.time.Now(), conf.ServerStabilizationTime) && srv.NodeType == NodeVoter {
+			a.logger.Debug("will not remove stale non-voting server node, as it has not passed stabilization time and is desired to become a voter", "id", id)
+		} else if err := a.removeServer(id); err != nil {
 			return err
 		}
+
+		a.logger.Debug("Attempting removal of stale non-voting server node", "id", id)
 	}
 
 	maxRemoval := (voters - 1) / 2
 
 	for _, id := range failed.StaleVoters {
 		if voters-1 < int(conf.MinQuorum) {
-			a.logger.Debug("will not remove server as it would leave less voters than the minimum number allowed", "id", id, "min", conf.MinQuorum)
+			a.logger.Debug("will not remove stale server node as it would leave less voters than the minimum number allowed", "id", id, "min", conf.MinQuorum)
 		} else if maxRemoval < 1 {
-			a.logger.Debug("will not remove server as removal of a majority of servers is not safe", "id", id)
+			a.logger.Debug("will not remove stale server node as removal of a majority of servers is not safe", "id", id)
 		} else if err := a.removeServer(id); err != nil {
 			return err
 		} else {
@@ -272,11 +281,11 @@ func (a *Autopilot) pruneDeadServers() error {
 
 	for _, srv := range failed.FailedVoters {
 		if voters-1 < int(conf.MinQuorum) {
-			a.logger.Debug("will not remove server as it would leave less voters than the minimum number allowed", "id", srv.ID, "min", conf.MinQuorum)
+			a.logger.Debug("will not remove failed server node as it would leave less voters than the minimum number allowed", "id", srv.ID, "min", conf.MinQuorum)
 		} else if maxRemoval < 1 {
-			a.logger.Debug("will not remove server as a removal of a majority of servers is not safe", "id", srv.ID)
+			a.logger.Debug("will not remove failed server node as a removal of a majority of servers is not safe", "id", srv.ID)
 		} else {
-			a.logger.Info("Attempting removal of failed server node", "id", srv.ID, "name", srv.Name, "address", srv.Address)
+			a.logger.Info("Attempting removal of failed voting server node", "id", srv.ID, "name", srv.Name, "address", srv.Address)
 			a.delegate.RemoveFailedServer(srv)
 			maxRemoval--
 			voters--
