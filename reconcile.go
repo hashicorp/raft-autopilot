@@ -244,7 +244,8 @@ func (a *Autopilot) pruneDeadServers() error {
 	// Decide whether to remove failed non-voters
 	for _, srv := range failed.FailedNonVoters {
 		h := a.GetServerHealth(srv.ID)
-		if h != nil && !h.IsStable(a.time.Now(), conf.ServerStabilizationTime) && srv.NodeType == NodeVoter {
+
+		if h != nil && a.time.Now().Sub(h.StableSince) < conf.ServerStabilizationTime && srv.NodeType == NodeVoter {
 			a.logger.Debug("will not remove failed non-voting server node, as it has not passed stabilization time and is desired to become a voter", "id", srv.ID)
 		} else {
 			a.logger.Info("Attempting removal of failed non-voting server node", "id", srv.ID, "name", srv.Name, "address", srv.Address)
