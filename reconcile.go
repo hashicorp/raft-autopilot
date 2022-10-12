@@ -257,11 +257,14 @@ func (a *Autopilot) pruneDeadServers() error {
 		h := a.GetServerHealth(id)
 		if srv, found := a.delegate.KnownServers()[id]; found && h != nil && !h.IsStable(a.time.Now(), conf.ServerStabilizationTime) && srv.NodeType == NodeVoter {
 			a.logger.Debug("will not remove stale non-voting server node, as it has not passed stabilization time and is desired to become a voter", "id", id)
-		} else if err := a.removeServer(id); err != nil {
-			return err
+			return nil
 		}
 
 		a.logger.Debug("Attempting removal of stale non-voting server node", "id", id)
+		err := a.removeServer(id)
+		if err != nil {
+			return err
+		}
 	}
 
 	maxRemoval := (voters - 1) / 2
