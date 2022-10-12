@@ -73,7 +73,7 @@ func (a *Autopilot) gatherNextStateInputs(ctx context.Context) (*nextStateInputs
 	// We need to pull the previous states knowledge of the first time a state was generated.
 	// This is really only important for when autopilot is first started. We will use the
 	// first state's time when determining if a server is stable. Under normal circumstances
-	// we need to just check that the current time - the servers StableSince time is greater
+	// we need to just check that the current time - the servers LastHealthStatusChangeTime time is greater
 	// than the configured stabilization time. However while autopilot has been running for
 	// less time than the stabilization time we need to consider all servers as stable
 	// to prevent unnecessary leader elections. Therefore its important to track the first
@@ -386,12 +386,12 @@ func buildServerState(inputs *nextStateInputs, srv raft.Server) ServerState {
 
 	// now populate the healthy field given the stats
 	state.Health.Healthy = state.isHealthy(leaderLastTerm, leaderLastIndex, inputs.Config)
-	// overwrite the StableSince field if this is a new server or when
+	// overwrite the LastHealthStatusChangeTime field if this is a new server or when
 	// the health status changes. No need for an else as we previously set
 	// it when we overwrote the whole Health structure when finding a
 	// server in the existing state
 	if previousHealthy == nil || *previousHealthy != state.Health.Healthy {
-		state.Health.StableSince = inputs.Now
+		state.Health.LastHealthStatusChangeTime = inputs.Now
 	}
 
 	return state
@@ -451,9 +451,9 @@ func ServerLessThan(id1 raft.ServerID, id2 raft.ServerID, s *State) bool {
 	// at this point we know that the raft state of both nodes is roughly
 	// equivalent so we want to now sort based on health
 	if srvI.Health.Healthy == srvJ.Health.Healthy {
-		if srvI.Health.StableSince.Before(srvJ.Health.StableSince) {
+		if srvI.Health.LastHealthStatusChangeTime.Before(srvJ.Health.LastHealthStatusChangeTime) {
 			return srvI.Health.Healthy
-		} else if srvJ.Health.StableSince.Before(srvI.Health.StableSince) {
+		} else if srvJ.Health.LastHealthStatusChangeTime.Before(srvI.Health.LastHealthStatusChangeTime) {
 			return !srvI.Health.Healthy
 		}
 

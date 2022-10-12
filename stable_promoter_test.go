@@ -43,40 +43,40 @@ func TestStablePromoter_CalculatePromotionsAndDemotions(t *testing.T) {
 			"11a62e75-5418-481e-90eb-c238d796dca9": {
 				State: RaftVoter,
 				Health: ServerHealth{
-					Healthy:     true,
-					StableSince: time.Now().Add(-20 * time.Second),
+					Healthy:                    true,
+					LastHealthStatusChangeTime: time.Now().Add(-20 * time.Second),
 				},
 			},
 			// healthy stable voter - will promote
 			"f536ec02-f859-4e61-a484-c1e6a085ce46": {
 				State: RaftNonVoter,
 				Health: ServerHealth{
-					Healthy:     true,
-					StableSince: time.Now().Add(-11 * time.Second),
+					Healthy:                    true,
+					LastHealthStatusChangeTime: time.Now().Add(-11 * time.Second),
 				},
 			},
 			// unhealthy - will not promote
 			"f94f3090-cd4c-4bca-9e24-97fb0535b3a4": {
 				State: RaftNonVoter,
 				Health: ServerHealth{
-					Healthy:     false,
-					StableSince: time.Now().Add(-11 * time.Second),
+					Healthy:                    false,
+					LastHealthStatusChangeTime: time.Now().Add(-11 * time.Second),
 				},
 			},
 			// still staging - will not promote
 			"ef7cecc1-4a49-491a-813a-fc666a22c3bc": {
 				State: RaftStaging,
 				Health: ServerHealth{
-					Healthy:     true,
-					StableSince: time.Now().Add(-11 * time.Second),
+					Healthy:                    true,
+					LastHealthStatusChangeTime: time.Now().Add(-11 * time.Second),
 				},
 			},
 			// not stable long enough - will not promote
 			"2d601ea3-3b51-4b8e-86da-aae5712c99e2": {
 				State: RaftNonVoter,
 				Health: ServerHealth{
-					Healthy:     true,
-					StableSince: time.Now().Add(-2 * time.Second),
+					Healthy:                    true,
+					LastHealthStatusChangeTime: time.Now().Add(-2 * time.Second),
 				},
 			},
 		},

@@ -141,8 +141,8 @@ type ServerHealth struct {
 	// Autopilot config.
 	Healthy bool
 
-	// StableSince is the last time this server's Healthy value changed.
-	StableSince time.Time
+	// LastHealthStatusChangeTime is the last time this server's Healthy value changed.
+	LastHealthStatusChangeTime time.Time
 }
 
 // IsStable returns true if the ServerState shows a stable, passing state
@@ -156,7 +156,7 @@ func (h *ServerHealth) IsStable(now time.Time, minStableDuration time.Duration) 
 		return false
 	}
 
-	if now.Sub(h.StableSince) < minStableDuration {
+	if now.Sub(h.LastHealthStatusChangeTime) < minStableDuration {
 		return false
 	}
 

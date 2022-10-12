@@ -506,8 +506,8 @@ func TestPruneDeadServers(t *testing.T) {
 							Address:    "198.18.0.6:8300",
 							NodeStatus: NodeFailed,
 						}, Health: ServerHealth{
-							Healthy:     false,
-							StableSince: time.Now().Add(-time.Hour * 3),
+							Healthy:                    false,
+							LastHealthStatusChangeTime: time.Now().Add(-time.Hour * 3),
 						},
 					},
 					// Stale non-voter
@@ -518,8 +518,8 @@ func TestPruneDeadServers(t *testing.T) {
 							Address:    "198.18.0.4:8300",
 							NodeStatus: NodeLeft,
 						}, Health: ServerHealth{
-							Healthy:     false,
-							StableSince: time.Now().Add(-time.Hour * 3),
+							Healthy:                    false,
+							LastHealthStatusChangeTime: time.Now().Add(-time.Hour * 3),
 						},
 					},
 				},
@@ -841,8 +841,8 @@ func TestPruneDeadServers(t *testing.T) {
 							NodeType:   NodeVoter,
 						}, State: RaftNonVoter,
 						Health: ServerHealth{
-							Healthy:     false,
-							StableSince: time.Now(),
+							Healthy:                    false,
+							LastHealthStatusChangeTime: time.Now(),
 						},
 					},
 					// Failed non-voter
@@ -855,8 +855,8 @@ func TestPruneDeadServers(t *testing.T) {
 							NodeType:   NodeVoter,
 						}, State: RaftNonVoter,
 						Health: ServerHealth{
-							Healthy:     false,
-							StableSince: time.Now(),
+							Healthy:                    false,
+							LastHealthStatusChangeTime: time.Now(),
 						},
 					},
 				},
