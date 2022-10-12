@@ -868,25 +868,6 @@ func TestPruneDeadServers(t *testing.T) {
 					uint64(0),
 					time.Duration(0),
 				).Return(&raftIndexFuture{}).Once()
-				//mraft.On("RemoveServer",
-				//	raft.ServerID("0aacc844-1d0a-4ba7-bbc2-bd88d51cb231"),
-				//	uint64(0),
-				//	time.Duration(0),
-				//).Return(&raftIndexFuture{}).Once()
-				// Failed non-voter
-				//mapp.On("RemoveFailedServer", &Server{
-				//	ID:         "8830c599-04cc-4b28-9b75-173355d49ab1",
-				//	Name:       "node6",
-				//	Address:    "198.18.0.6:8300",
-				//	NodeStatus: NodeFailed,
-				//}).Once()
-				//mapp.On("RemoveFailedServer", &Server{
-				//	ID:         "3857f1d4-5c23-4016-9078-fee502c0d1be",
-				//	Name:       "node3",
-				//	Address:    "198.18.0.3:8300",
-				//	NodeStatus: NodeFailed,
-				//	NodeType:   NodeVoter,
-				//}).Once()
 			},
 		},
 	}
