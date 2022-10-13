@@ -275,14 +275,14 @@ func (a *Autopilot) pruneDeadServers() error {
 	return nil
 }
 
-func adjudicateRemoval(logger hclog.Logger, voterNumProvider func() int, s RaftServers, minQuorum uint) []raft.ServerID {
+func adjudicateRemoval(logger hclog.Logger, voterCountProvider func() int, s RaftServers, minQuorum uint) []raft.ServerID {
 	var ids []raft.ServerID
-	failureTolerance := getFailureTolerance(voterNumProvider())
+	failureTolerance := getFailureTolerance(voterCountProvider())
 
 	for id, v := range s {
 		if failureTolerance < 1 {
 			logger.Debug("will not remove server node as removal of a majority of servers is not safe", "id", id)
-		} else if v != nil && v.IsPotentialVoter() && !isRemovalQuorate(voterNumProvider(), minQuorum) {
+		} else if v != nil && v.IsPotentialVoter() && !isRemovalQuorate(voterCountProvider(), minQuorum) {
 			logger.Debug("will not remove server node as it would leave less voters than the minimum number allowed", "id", id, "min", minQuorum)
 		} else if v != nil && v.IsCurrentVoter() {
 			failureTolerance--
