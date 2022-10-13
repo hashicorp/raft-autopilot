@@ -123,7 +123,7 @@ func TestRunLifeCycle(t *testing.T) {
 					},
 					State:  RaftLeader,
 					Stats:  *serverStats["7875975d-d54b-49c1-a400-9fefcc706c67"],
-					Health: ServerHealth{Healthy: true, LastHealthStatusChangeTime: ts},
+					Health: ServerHealth{Healthy: true, StableSince: ts},
 				},
 				"ecfc5237-63c3-4b09-94b9-d5682d9ae5b1": {
 					Server: Server{
@@ -137,7 +137,7 @@ func TestRunLifeCycle(t *testing.T) {
 					},
 					State:  RaftVoter,
 					Stats:  *serverStats["ecfc5237-63c3-4b09-94b9-d5682d9ae5b1"],
-					Health: ServerHealth{Healthy: true, LastHealthStatusChangeTime: ts},
+					Health: ServerHealth{Healthy: true, StableSince: ts},
 				},
 				"e72eb8da-604d-47cd-bd7f-69ec120ea2b7": {
 					Server: Server{
@@ -151,7 +151,7 @@ func TestRunLifeCycle(t *testing.T) {
 					},
 					State:  RaftVoter,
 					Stats:  *serverStats["e72eb8da-604d-47cd-bd7f-69ec120ea2b7"],
-					Health: ServerHealth{Healthy: true, LastHealthStatusChangeTime: ts},
+					Health: ServerHealth{Healthy: true, StableSince: ts},
 				},
 			},
 			Leader: "7875975d-d54b-49c1-a400-9fefcc706c67",

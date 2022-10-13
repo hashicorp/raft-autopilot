@@ -159,8 +159,8 @@ func TestServerIsStable(t *testing.T) {
 		},
 		"raft-unhealthy": {
 			health: &ServerHealth{
-				Healthy:                    false,
-				LastHealthStatusChangeTime: time.Date(2020, 11, 2, 0, 0, 0, 0, time.UTC),
+				Healthy:     false,
+				StableSince: time.Date(2020, 11, 2, 0, 0, 0, 0, time.UTC),
 			},
 			now:               time.Date(2020, 11, 2, 1, 0, 0, 0, time.UTC),
 			minStableDuration: 10 * time.Second,
@@ -168,8 +168,8 @@ func TestServerIsStable(t *testing.T) {
 		},
 		"not-stable": {
 			health: &ServerHealth{
-				Healthy:                    true,
-				LastHealthStatusChangeTime: time.Date(2020, 11, 2, 1, 0, 0, 0, time.UTC),
+				Healthy:     true,
+				StableSince: time.Date(2020, 11, 2, 1, 0, 0, 0, time.UTC),
 			},
 			now:               time.Date(2020, 11, 2, 1, 0, 1, 0, time.UTC),
 			minStableDuration: 10 * time.Second,
@@ -177,8 +177,8 @@ func TestServerIsStable(t *testing.T) {
 		},
 		"ok": {
 			health: &ServerHealth{
-				Healthy:                    true,
-				LastHealthStatusChangeTime: time.Date(2020, 11, 2, 1, 0, 0, 0, time.UTC),
+				Healthy:     true,
+				StableSince: time.Date(2020, 11, 2, 1, 0, 0, 0, time.UTC),
 			},
 			now:               time.Date(2020, 11, 2, 1, 0, 10, 0, time.UTC),
 			minStableDuration: 10 * time.Second,
