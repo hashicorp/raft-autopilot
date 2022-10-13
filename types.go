@@ -242,20 +242,84 @@ type RaftChanges struct {
 	Leader     raft.ServerID
 }
 
-type FailedServers struct {
-	// StaleNonVoters are the ids of those server in the raft configuration as non-voters
-	// that are not present in the delegates view of what servers should be available
-	StaleNonVoters []raft.ServerID
-	// StaleVoters are the ids of those servers in the raft configuration as voters that
-	// are not present in the delegates view of what servers should be available
-	StaleVoters []raft.ServerID
+type VoterEligibility struct {
+	currentVoter   bool
+	potentialVoter bool
+}
 
-	// FailedNonVoters are the servers without voting rights in the cluster that the
-	// delegate has indicated are in a failed state
-	FailedNonVoters []*Server
-	// FailedVoters are the servers without voting rights in the cluster that the
-	// delegate has indicated are in a failed state
-	FailedVoters []*Server
+func (v *VoterEligibility) IsCurrentVoter() bool {
+	return v.currentVoter
+}
+
+func (v *VoterEligibility) IsPotentialVoter() bool {
+	return v.potentialVoter
+}
+
+func (v *VoterEligibility) SetPotentialVoter(isVoter bool) {
+	v.potentialVoter = isVoter
+}
+
+type RaftServers map[raft.ServerID]*VoterEligibility
+
+func (s *RaftServers) FilterVoters(isCurrentVoter bool) RaftServers {
+	servers := make(RaftServers)
+	for id, v := range *s {
+		if v.IsCurrentVoter() == isCurrentVoter {
+			servers[id] = v
+		}
+	}
+	return servers
+}
+
+type CategorizedServers struct {
+	// StaleNonVoters are the IDs of non-voting server nodes in the raft configuration
+	// that are not present in the delegates view of the server nodes should be available
+	StaleNonVoters RaftServers
+	// StaleVoters are the IDs of voting server nodes in the raft configuration
+	//that are not present in the delegates view of the servers node should be available
+	StaleVoters RaftServers
+	// FailedNonVoters are the IDs of non-voting server nodes in the raft cluster
+	// that the delegate has indicated are in a failed state
+	FailedNonVoters RaftServers
+	// FailedVoters are the IDs of voting server nodes in the raft cluster
+	// that the delegate has indicated are in a failed state
+	FailedVoters RaftServers
+	// HealthyNonVoters are the IDs of non-voting server nodes
+	// that the delegate has indicated are operating as intended
+	HealthyNonVoters RaftServers
+	// HealthyVoters are the IDs of voting server nodes
+	// that the delegate has indicated are operating as intended
+	HealthyVoters RaftServers
+}
+
+func (s *CategorizedServers) PotentialVoters() int {
+	potentialVoters := 0
+
+	for _, v := range s.FailedNonVoters {
+		if v.IsPotentialVoter() {
+			potentialVoters++
+		}
+	}
+
+	for _, v := range s.FailedVoters {
+		if v.IsPotentialVoter() {
+			potentialVoters++
+		}
+	}
+
+	for _, v := range s.HealthyNonVoters {
+		if v.IsPotentialVoter() {
+			potentialVoters++
+		}
+	}
+
+	for _, v := range s.HealthyVoters {
+		if v.IsPotentialVoter() {
+			potentialVoters++
+		}
+	}
+
+	return potentialVoters
 }
 
 // Promoter is an interface to provide promotion/demotion algorithms to the core autopilot type.
@@ -287,10 +351,10 @@ type Promoter interface {
 	// CalculatePromotionsAndDemotions
 	CalculatePromotionsAndDemotions(*Config, *State) RaftChanges
 
-	// FilterFailedServerRemovals takes in the current state and structure outlining all the
+	// FilterServerRemovals takes in the current state and structure outlining all the
 	// failed/stale servers and will return those failed servers which the promoter thinks
 	// should be allowed to be removed.
-	FilterFailedServerRemovals(*Config, *State, *FailedServers) *FailedServers
+	FilterServerRemovals(*Config, *State, *CategorizedServers) *CategorizedServers
 }
 
 // TimeProvider is an interface for getting a local time. This is mainly useful for testing

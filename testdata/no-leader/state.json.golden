@@ -23,7 +23,7 @@
          },
          "Health": {
             "Healthy": false,
-            "StableSince": "2020-11-02T15:00:00Z"
+            "LastHealthStatusChangeTime": "2020-11-02T15:00:00Z"
          }
       },
       "e72eb8da-604d-47cd-bd7f-69ec120ea2b7": {
@@ -47,7 +47,7 @@
          },
          "Health": {
             "Healthy": false,
-            "StableSince": "2020-11-02T15:00:00Z"
+            "LastHealthStatusChangeTime": "2020-11-02T15:00:00Z"
          }
       },
       "ecfc5237-63c3-4b09-94b9-d5682d9ae5b1": {
@@ -71,7 +71,7 @@
          },
          "Health": {
             "Healthy": false,
-            "StableSince": "2020-11-02T15:00:00Z"
+            "LastHealthStatusChangeTime": "2020-11-02T15:00:00Z"
          }
       }
    },

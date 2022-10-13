@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/raft"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -210,5 +212,141 @@ func TestServerStabilizationTime(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return s.ServerStabilizationTime(conf) == 350*time.Millisecond
 	}, 500*time.Millisecond, 50*time.Millisecond)
+}
 
+func TestFilterVoters(t *testing.T) {
+	type testCase struct {
+		servers     *RaftServers
+		param       bool
+		numExpected int
+		expectedIds []string
+	}
+
+	cases := map[string]testCase{
+		"no-servers": {
+			servers:     &RaftServers{},
+			param:       true,
+			numExpected: 0,
+		},
+		"no-current-voters-when-true-single": {
+			servers: &RaftServers{
+				"abc123": &VoterEligibility{
+					currentVoter:   false,
+					potentialVoter: false,
+				},
+			},
+			param:       true,
+			numExpected: 0,
+		},
+		"current-voters-when-true-single": {
+			servers: &RaftServers{
+				"abc123": &VoterEligibility{
+					currentVoter:   true,
+					potentialVoter: true,
+				},
+			},
+			param:       true,
+			numExpected: 1,
+			expectedIds: []string{"abc123"},
+		},
+		"no-current-voters-when-true-multiple": {
+			servers: &RaftServers{
+				"abc123": &VoterEligibility{
+					currentVoter:   false,
+					potentialVoter: false,
+				},
+				"456def": &VoterEligibility{
+					currentVoter:   false,
+					potentialVoter: true,
+				},
+			},
+			param:       true,
+			numExpected: 0,
+		},
+		"current-voters-when-true-multiple": {
+			servers: &RaftServers{
+				"abc123": &VoterEligibility{
+					currentVoter:   true,
+					potentialVoter: true,
+				},
+				"def456": &VoterEligibility{
+					currentVoter:   true,
+					potentialVoter: true,
+				},
+			},
+			param:       true,
+			numExpected: 2,
+			expectedIds: []string{"abc123", "def456"},
+		},
+		"non-voters-when-false-single": {
+			servers: &RaftServers{
+				"abc123": &VoterEligibility{
+					currentVoter:   false,
+					potentialVoter: true,
+				},
+			},
+			param:       false,
+			numExpected: 1,
+			expectedIds: []string{"abc123"},
+		},
+	}
+
+	for name, tcase := range cases {
+		name := name
+		tcase := tcase
+		t.Run(name, func(t *testing.T) {
+			got := tcase.servers.FilterVoters(tcase.param)
+			require.Equal(t, tcase.numExpected, len(got))
+			for _, key := range tcase.expectedIds {
+				assert.Contains(t, got, raft.ServerID(key))
+			}
+		})
+	}
+}
+
+func TestGetPotentialVotersFromCategorizedServers(t *testing.T) {
+	//func (s *CategorizedServers) PotentialVoters() int {
+	type testCase struct {
+		servers     *CategorizedServers
+		numExpected int
+	}
+
+	cases := map[string]testCase{
+		"no-servers": {
+			servers:     &CategorizedServers{},
+			numExpected: 0,
+		},
+		"single-one-of-each": {
+			servers: &CategorizedServers{
+				StaleNonVoters: RaftServers{
+					"abc": &VoterEligibility{currentVoter: false, potentialVoter: false},
+				},
+				StaleVoters: RaftServers{
+					"def": &VoterEligibility{currentVoter: true, potentialVoter: false},
+				},
+				FailedNonVoters: RaftServers{
+					"ghi": &VoterEligibility{currentVoter: false, potentialVoter: true},
+				},
+				FailedVoters: RaftServers{
+					"jkl": &VoterEligibility{currentVoter: false, potentialVoter: true},
+				},
+				HealthyNonVoters: RaftServers{
+					"mno": &VoterEligibility{currentVoter: false, potentialVoter: true},
+				},
+				HealthyVoters: RaftServers{
+					"pqr": &VoterEligibility{currentVoter: true, potentialVoter: true},
+				},
+			},
+			numExpected: 4,
+		},
+	}
+
+	for name, tcase := range cases {
+		name := name
+		tcase := tcase
+		t.Run(name, func(t *testing.T) {
+			got := tcase.servers.PotentialVoters()
+			require.Equal(t, tcase.numExpected, got)
+		})
+	}
 }
