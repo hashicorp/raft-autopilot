@@ -26,16 +26,16 @@ func (_m *MockPromoter) CalculatePromotionsAndDemotions(_a0 *Config, _a1 *State)
 	return r0
 }
 
-// FilterServerRemovals provides a mock function with given fields: _a0, _a1, _a2
-func (_m *MockPromoter) FilterServerRemovals(_a0 *Config, _a1 *State, _a2 *CategorizedServers) *CategorizedServers {
+// FilterFailedServerRemovals provides a mock function with given fields: _a0, _a1, _a2
+func (_m *MockPromoter) FilterFailedServerRemovals(_a0 *Config, _a1 *State, _a2 *FailedServers) *FailedServers {
 	ret := _m.Called(_a0, _a1, _a2)
 
-	var r0 *CategorizedServers
-	if rf, ok := ret.Get(0).(func(*Config, *State, *CategorizedServers) *CategorizedServers); ok {
+	var r0 *FailedServers
+	if rf, ok := ret.Get(0).(func(*Config, *State, *FailedServers) *FailedServers); ok {
 		r0 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*CategorizedServers)
+			r0 = ret.Get(0).(*FailedServers)
 		}
 	}
 

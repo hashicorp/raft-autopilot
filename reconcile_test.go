@@ -958,7 +958,8 @@ func TestPruneDeadServers(t *testing.T) {
 				ServerStabilizationTime: time.Hour * 6,
 			}
 			mpromoter := NewMockPromoter(t)
-			mpromoter.On("FilterServerRemovals", conf, &tcase.state, &tcase.expectedServers).Return(&tcase.expectedServers).Once()
+			failedServers := tcase.expectedServers.convertToFailedServers(&tcase.state)
+			mpromoter.On("FilterFailedServerRemovals", conf, &tcase.state, failedServers).Return(failedServers) //.Once()
 
 			mapp := NewMockApplicationIntegration(t)
 			mapp.On("AutopilotConfig").Return(conf).Once()

@@ -322,6 +322,89 @@ func (s *CategorizedServers) PotentialVoters() int {
 	return potentialVoters
 }
 
+// Essentially a DTO type to support the promoter
+type FailedServers struct {
+	StaleNonVoters  []raft.ServerID
+	StaleVoters     []raft.ServerID
+	FailedNonVoters []*Server
+	FailedVoters    []*Server
+}
+
+func (s *CategorizedServers) convertToFailedServers(state *State) *FailedServers {
+	var failedServers FailedServers
+	var staleNonVoting []raft.ServerID
+	var staleVoting []raft.ServerID
+	var failedNonVoters []*Server
+	var failedVoters []*Server
+
+	for id, _ := range s.StaleNonVoters {
+		staleNonVoting = append(staleNonVoting, id)
+	}
+
+	for id, _ := range s.StaleVoters {
+		staleVoting = append(staleVoting, id)
+	}
+
+	for id, _ := range s.FailedNonVoters {
+		if srv, found := state.Servers[id]; found {
+			failedNonVoters = append(failedNonVoters, &srv.Server)
+		}
+	}
+
+	for id, _ := range s.FailedVoters {
+		if srv, found := state.Servers[id]; found {
+			failedVoters = append(failedVoters, &srv.Server)
+		}
+	}
+
+	failedServers = FailedServers{
+		StaleNonVoters:  staleNonVoting,
+		StaleVoters:     staleVoting,
+		FailedNonVoters: failedNonVoters,
+		FailedVoters:    failedVoters,
+	}
+
+	return &failedServers
+}
+
+func (s *CategorizedServers) convertFromFailedServers(servers *FailedServers) *CategorizedServers {
+	var staleNonVoters RaftServers
+	var staleVoters RaftServers
+	var failedNonVoters RaftServers
+	var failedVoters RaftServers
+
+	for _, id := range servers.StaleNonVoters {
+		if v, found := s.StaleNonVoters[id]; found {
+			staleNonVoters[id] = v
+		}
+	}
+
+	for _, id := range servers.StaleVoters {
+		if v, found := s.StaleVoters[id]; found {
+			staleVoters[id] = v
+		}
+	}
+
+	for _, srv := range servers.FailedNonVoters {
+		if v, found := s.FailedNonVoters[srv.ID]; found {
+			failedNonVoters[srv.ID] = v
+		}
+	}
+
+	for _, srv := range servers.FailedVoters {
+		if v, found := s.FailedVoters[srv.ID]; found {
+			failedVoters[srv.ID] = v
+		}
+	}
+
+	s.StaleNonVoters = staleNonVoters
+	s.StaleVoters = staleVoters
+	s.FailedNonVoters = failedNonVoters
+	s.FailedVoters = failedVoters
+
+	return s
+}
+
 // Promoter is an interface to provide promotion/demotion algorithms to the core autopilot type.
 // The BasicPromoter satisfies this interface and will promote any stable servers but other
 // algorithms could be implemented. The implementation of these methods shouldn't "block".
@@ -351,10 +434,10 @@ type Promoter interface {
 	// CalculatePromotionsAndDemotions
 	CalculatePromotionsAndDemotions(*Config, *State) RaftChanges
 
-	// FilterServerRemovals takes in the current state and structure outlining all the
+	// FilterFailedServerRemovals takes in the current state and structure outlining all the
 	// failed/stale servers and will return those failed servers which the promoter thinks
 	// should be allowed to be removed.
-	FilterServerRemovals(*Config, *State, *CategorizedServers) *CategorizedServers
+	FilterFailedServerRemovals(*Config, *State, *FailedServers) *FailedServers
 }
 
 // TimeProvider is an interface for getting a local time. This is mainly useful for testing

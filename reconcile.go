@@ -234,7 +234,11 @@ func (a *Autopilot) pruneDeadServers() error {
 	}
 
 	state := a.GetState()
-	servers = a.promoter.FilterServerRemovals(conf, state, servers)
+
+	// Support not breaking the promoter's interface for filtering servers
+	failedServers := servers.convertToFailedServers(state)
+	failedServers = a.promoter.FilterFailedServerRemovals(conf, state, failedServers)
+	servers.convertFromFailedServers(failedServers)
 
 	// Try to remove servers in order of increasing precedence
 

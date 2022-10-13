@@ -31,8 +31,8 @@ func (_ *StablePromoter) GetNodeTypes(_ *Config, s *State) map[raft.ServerID]Nod
 	return types
 }
 
-func (_ *StablePromoter) FilterServerRemovals(_ *Config, _ *State, servers *CategorizedServers) *CategorizedServers {
-	return servers
+func (_ *StablePromoter) FilterFailedServerRemovals(_ *Config, _ *State, failed *FailedServers) *FailedServers {
+	return failed
 }
 
 // CalculatePromotionsAndDemotions will return a list of all promotions and demotions to be done as well as the server id of
