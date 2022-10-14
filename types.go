@@ -438,6 +438,10 @@ type Promoter interface {
 	// failed/stale servers and will return those failed servers which the promoter thinks
 	// should be allowed to be removed.
 	FilterFailedServerRemovals(*Config, *State, *FailedServers) *FailedServers
+
+	// PotentialVoterPredicate takes a NodeType and returns whether that type represents
+	// a potential voter, based on a predicate implemented by the promoter.
+	PotentialVoterPredicate(NodeType) bool
 }
 
 // TimeProvider is an interface for getting a local time. This is mainly useful for testing

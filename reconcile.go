@@ -163,7 +163,7 @@ func getRaftServerIds(servers []raft.Server) RaftServers {
 	return ids
 }
 
-func (a *Autopilot) categorizeServers() (*CategorizedServers, error) {
+func (a *Autopilot) categorizeServers(voterPredicate func(NodeType) bool) (*CategorizedServers, error) {
 	cfg, err := a.getRaftConfiguration()
 	if err != nil {
 		return nil, err
@@ -195,7 +195,7 @@ func (a *Autopilot) categorizeServers() (*CategorizedServers, error) {
 			failedNonVoters[id] = v
 		}
 
-		v.SetPotentialVoter(srv.NodeType == NodeVoter)
+		v.SetPotentialVoter(voterPredicate(srv.NodeType))
 	}
 
 	c := &CategorizedServers{
@@ -228,7 +228,7 @@ func (a *Autopilot) pruneDeadServers() error {
 		return nil
 	}
 
-	servers, err := a.categorizeServers()
+	servers, err := a.categorizeServers(a.promoter.PotentialVoterPredicate)
 	if err != nil {
 		return err
 	}

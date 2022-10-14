@@ -960,7 +960,7 @@ func TestPruneDeadServers(t *testing.T) {
 			mpromoter := NewMockPromoter(t)
 			failedServers := tcase.expectedServers.convertToFailedServers(&tcase.state)
 			mpromoter.On("FilterFailedServerRemovals", conf, &tcase.state, failedServers).Return(failedServers) //.Once()
-
+			mpromoter.On("PotentialVoterPredicate", NodeVoter).Return(true)
 			mapp := NewMockApplicationIntegration(t)
 			mapp.On("AutopilotConfig").Return(conf).Once()
 			mapp.On("KnownServers").Return(tcase.knownServers)
