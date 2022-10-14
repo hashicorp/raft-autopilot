@@ -368,10 +368,10 @@ func (s *CategorizedServers) convertToFailedServers(state *State) *FailedServers
 }
 
 func (s *CategorizedServers) convertFromFailedServers(servers *FailedServers) *CategorizedServers {
-	var staleNonVoters RaftServers
-	var staleVoters RaftServers
-	var failedNonVoters RaftServers
-	var failedVoters RaftServers
+	staleNonVoters := make(RaftServers)
+	staleVoters := make(RaftServers)
+	failedNonVoters := make(RaftServers)
+	failedVoters := make(RaftServers)
 
 	for _, id := range servers.StaleNonVoters {
 		if v, found := s.StaleNonVoters[id]; found {
