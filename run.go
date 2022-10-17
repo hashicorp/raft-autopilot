@@ -155,7 +155,8 @@ func (a *Autopilot) beginExecution(ctx context.Context, exec *execInfo) {
 			return
 		case <-reconcileTicker.C:
 			if err := a.reconcile(); err != nil {
-				a.logger.Error("Failed to reconcile current state with the desired state")
+				a.logger.Error("Failed to reconcile current state with the desired state",
+					"error", err)
 			}
 
 			if err := a.pruneDeadServers(); err != nil {
