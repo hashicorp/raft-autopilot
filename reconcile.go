@@ -270,7 +270,7 @@ func (a *Autopilot) pruneDeadServers() error {
 	// Support not breaking the promoter's interface for filtering servers
 	failedServers := servers.convertToFailedServers(state)
 	failedServers = a.promoter.FilterFailedServerRemovals(conf, state, failedServers)
-	servers.convertFromFailedServers(failedServers)
+	servers = servers.convertFromFailedServers(failedServers)
 
 	// Partially apply (wrap) some functions for clarity below
 	removeStale := removeStale(a)
