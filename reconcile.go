@@ -3,7 +3,6 @@ package autopilot
 import (
 	"fmt"
 
-	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/raft"
 )
 
@@ -151,18 +150,6 @@ func (a *Autopilot) applyDemotions(state *State, changes RaftChanges) (bool, err
 	return demoted, nil
 }
 
-func getRaftServerIds(servers []raft.Server) RaftServers {
-	ids := make(RaftServers)
-
-	for _, server := range servers {
-		ids[server.ID] = &VoterEligibility{
-			currentVoter: server.Suffrage == raft.Voter,
-		}
-	}
-
-	return ids
-}
-
 func (a *Autopilot) categorizeServers(voterPredicate func(NodeType) bool) (*CategorizedServers, error) {
 	cfg, err := a.getRaftConfiguration()
 	if err != nil {
@@ -171,7 +158,7 @@ func (a *Autopilot) categorizeServers(voterPredicate func(NodeType) bool) (*Cate
 
 	// Get servers as raft sees them currently
 	// (we won't know if they have the potential to become voters yet)
-	raftServers := getRaftServerIds(cfg.Servers)
+	raftServers := getServerSuffrage(cfg.Servers)
 	failedVoters := make(RaftServers)
 	failedNonVoters := make(RaftServers)
 	healthyVoters := make(RaftServers)
@@ -210,44 +197,42 @@ func (a *Autopilot) categorizeServers(voterPredicate func(NodeType) bool) (*Cate
 	return c, nil
 }
 
-func getFailureTolerance(nodes int) int {
-	return (nodes - 1) / 2
-}
-
-func isRemovalQuorate(voters int, minQuorum uint) bool {
-	return voters-1 >= int(minQuorum)
-}
-
-func removeStale(a *Autopilot) func(id raft.ServerID) error {
-	return func(id raft.ServerID) error {
-		if err := a.removeServer(id); err != nil {
-			return err
-		}
-
-		return nil
+func (a *Autopilot) RemoveStaleServer(id raft.ServerID) error {
+	a.logger.Debug("removing server by ID", "id", id)
+	future := a.raft.RemoveServer(id, 0, 0)
+	if err := future.Error(); err != nil {
+		a.logger.Error("failed to remove raft server",
+			"id", id,
+			"error", err,
+		)
+		return err
 	}
+	a.logger.Info("removed server", "id", id)
+	return nil
 }
 
-func removeFailed(a *Autopilot) func(id raft.ServerID) error {
-	return func(id raft.ServerID) error {
-		srv, found := a.delegate.KnownServers()[id]
-		if found {
-			a.delegate.RemoveFailedServer(srv)
-		}
-
-		return nil
-	}
-}
-
-func remove(removeFunc func(raft.ServerID) error, toRemove []raft.ServerID) error {
+func (a *Autopilot) RemoveStaleServers(toRemove []raft.ServerID) error {
 	for _, id := range toRemove {
-		err := removeFunc(id)
+		err := a.RemoveStaleServer(id)
 		if err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func (a *Autopilot) RemoveFailedServer(id raft.ServerID) {
+	srv, found := a.delegate.KnownServers()[id]
+	if found {
+		a.delegate.RemoveFailedServer(srv)
+	}
+}
+
+func (a *Autopilot) RemoveFailedServers(toRemove []raft.ServerID) {
+	for _, id := range toRemove {
+		a.RemoveFailedServer(id)
+	}
 }
 
 func (a *Autopilot) pruneDeadServers() error {
@@ -272,49 +257,44 @@ func (a *Autopilot) pruneDeadServers() error {
 	failedServers = a.promoter.FilterFailedServerRemovals(conf, state, failedServers)
 	servers = servers.convertFromFailedServers(failedServers)
 
-	// Partially apply (wrap) some functions for clarity below
-	removeStale := removeStale(a)
-	removeFailed := removeFailed(a)
-	adjudicate := func(logger hclog.Logger, minQuorum uint, voterCountProvider func() int) func(RaftServers) []raft.ServerID {
+	// Curry adjudicate function
+	adjudicate := func(voterCountProvider func() int) func(RaftServers) []raft.ServerID {
 		return func(raftServers RaftServers) []raft.ServerID {
-			return adjudicateRemoval(logger, minQuorum, voterCountProvider, raftServers)
+			return a.adjudicateRemoval(voterCountProvider, raftServers)
 		}
-	}(a.logger, conf.MinQuorum, servers.PotentialVoters)
+	}(servers.PotentialVoters)
 
 	// Try to remove servers in order of increasing precedence
 
 	// Remove all stale non-voters
-	if err = remove(removeStale, adjudicate(servers.StaleNonVoters)); err != nil {
+	if err = a.RemoveStaleServers(adjudicate(servers.StaleNonVoters)); err != nil {
 		return err
 	}
 
 	// Remove stale voters
-	if err = remove(removeStale, adjudicate(servers.StaleVoters)); err != nil {
+	if err = a.RemoveStaleServers(adjudicate(servers.StaleVoters)); err != nil {
 		return err
 	}
 
 	// Remove failed non-voters
-	if err = remove(removeFailed, adjudicate(servers.FailedNonVoters)); err != nil {
-		return err
-	}
+	a.RemoveFailedServers(adjudicate(servers.FailedNonVoters))
 
 	// Remove failed voters
-	if err = remove(removeFailed, adjudicate(servers.FailedVoters)); err != nil {
-		return err
-	}
+	a.RemoveFailedServers(adjudicate(servers.FailedVoters))
 
 	return nil
 }
 
-func adjudicateRemoval(logger hclog.Logger, minQuorum uint, voterCountProvider func() int, s RaftServers) []raft.ServerID {
+func (a *Autopilot) adjudicateRemoval(voterCountProvider func() int, s RaftServers) []raft.ServerID {
 	var ids []raft.ServerID
-	failureTolerance := getFailureTolerance(voterCountProvider())
+	failureTolerance := (voterCountProvider() - 1) / 2
+	minQuorum := a.delegate.AutopilotConfig().MinQuorum
 
 	for id, v := range s {
-		if failureTolerance < 1 {
-			logger.Debug("will not remove server node as removal of a majority of servers is not safe", "id", id)
-		} else if v != nil && v.IsPotentialVoter() && !isRemovalQuorate(voterCountProvider(), minQuorum) {
-			logger.Debug("will not remove server node as it would leave less voters than the minimum number allowed", "id", id, "min", minQuorum)
+		if v != nil && v.IsPotentialVoter() && voterCountProvider()-1 < int(minQuorum) {
+			a.logger.Debug("will not remove server node as it would leave less voters than the minimum number allowed", "id", id, "min", minQuorum)
+		} else if failureTolerance < 1 {
+			a.logger.Debug("will not remove server node as removal of a majority of servers is not safe", "id", id)
 		} else if v != nil && v.IsCurrentVoter() {
 			failureTolerance--
 			delete(s, id)
@@ -322,6 +302,18 @@ func adjudicateRemoval(logger hclog.Logger, minQuorum uint, voterCountProvider f
 		} else {
 			delete(s, id)
 			ids = append(ids, id)
+		}
+	}
+
+	return ids
+}
+
+func getServerSuffrage(servers []raft.Server) RaftServers {
+	ids := make(RaftServers)
+
+	for _, server := range servers {
+		ids[server.ID] = &VoterEligibility{
+			currentVoter: server.Suffrage == raft.Voter,
 		}
 	}
 

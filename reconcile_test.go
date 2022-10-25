@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/raft"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -1075,10 +1076,10 @@ func TestPruneDeadServers(t *testing.T) {
 			}
 			mpromoter := NewMockPromoter(t)
 			failedServers := tcase.expectedServers.convertToFailedServers(&tcase.state)
-			mpromoter.On("FilterFailedServerRemovals", conf, &tcase.state, failedServers).Return(failedServers) //.Once()
+			mpromoter.On("FilterFailedServerRemovals", conf, &tcase.state, mock.AnythingOfType("*autopilot.FailedServers")).Return(failedServers).Once()
 			mpromoter.On("PotentialVoterPredicate", NodeVoter).Return(true)
 			mapp := NewMockApplicationIntegration(t)
-			mapp.On("AutopilotConfig").Return(conf).Once()
+			mapp.On("AutopilotConfig").Return(conf)
 			mapp.On("KnownServers").Return(tcase.knownServers)
 
 			mraft := NewMockRaft(t)
