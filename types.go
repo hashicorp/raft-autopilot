@@ -259,10 +259,10 @@ func (v *VoterEligibility) SetPotentialVoter(isVoter bool) {
 	v.potentialVoter = isVoter
 }
 
-type RaftServers map[raft.ServerID]*VoterEligibility
+type RaftServerEligibility map[raft.ServerID]*VoterEligibility
 
-func (s *RaftServers) FilterVoters(isCurrentVoter bool) RaftServers {
-	servers := make(RaftServers)
+func (s *RaftServerEligibility) FilterVoters(isCurrentVoter bool) RaftServerEligibility {
+	servers := make(RaftServerEligibility)
 	for id, v := range *s {
 		if v.IsCurrentVoter() == isCurrentVoter {
 			servers[id] = v
@@ -274,22 +274,22 @@ func (s *RaftServers) FilterVoters(isCurrentVoter bool) RaftServers {
 type CategorizedServers struct {
 	// StaleNonVoters are the IDs of non-voting server nodes in the raft configuration
 	// that are not present in the delegates view of the server nodes should be available
-	StaleNonVoters RaftServers
+	StaleNonVoters RaftServerEligibility
 	// StaleVoters are the IDs of voting server nodes in the raft configuration
 	//that are not present in the delegates view of the servers node should be available
-	StaleVoters RaftServers
+	StaleVoters RaftServerEligibility
 	// FailedNonVoters are the IDs of non-voting server nodes in the raft cluster
 	// that the delegate has indicated are in a failed state
-	FailedNonVoters RaftServers
+	FailedNonVoters RaftServerEligibility
 	// FailedVoters are the IDs of voting server nodes in the raft cluster
 	// that the delegate has indicated are in a failed state
-	FailedVoters RaftServers
+	FailedVoters RaftServerEligibility
 	// HealthyNonVoters are the IDs of non-voting server nodes
 	// that the delegate has indicated are operating as intended
-	HealthyNonVoters RaftServers
+	HealthyNonVoters RaftServerEligibility
 	// HealthyVoters are the IDs of voting server nodes
 	// that the delegate has indicated are operating as intended
-	HealthyVoters RaftServers
+	HealthyVoters RaftServerEligibility
 }
 
 func (s *CategorizedServers) PotentialVoters() int {
@@ -368,10 +368,10 @@ func (s *CategorizedServers) convertToFailedServers(state *State) *FailedServers
 }
 
 func (s *CategorizedServers) convertFromFailedServers(servers *FailedServers) *CategorizedServers {
-	staleNonVoters := make(RaftServers)
-	staleVoters := make(RaftServers)
-	failedNonVoters := make(RaftServers)
-	failedVoters := make(RaftServers)
+	staleNonVoters := make(RaftServerEligibility)
+	staleVoters := make(RaftServerEligibility)
+	failedNonVoters := make(RaftServerEligibility)
+	failedVoters := make(RaftServerEligibility)
 
 	for _, id := range servers.StaleNonVoters {
 		if v, found := s.StaleNonVoters[id]; found {

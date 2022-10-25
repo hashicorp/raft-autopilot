@@ -159,14 +159,17 @@ func (a *Autopilot) categorizeServers(voterPredicate func(NodeType) bool) (*Cate
 	// Get servers as raft sees them currently
 	// (we won't know if they have the potential to become voters yet)
 	raftServers := getServerSuffrage(cfg.Servers)
-	failedVoters := make(RaftServers)
-	failedNonVoters := make(RaftServers)
-	healthyVoters := make(RaftServers)
-	healthyNonVoters := make(RaftServers)
+	failedVoters := make(RaftServerEligibility)
+	failedNonVoters := make(RaftServerEligibility)
+	healthyVoters := make(RaftServerEligibility)
+	healthyNonVoters := make(RaftServerEligibility)
 
+	// Loop over all the servers the application knows about
 	for id, srv := range a.delegate.KnownServers() {
 		v, found := raftServers[id]
 		if !found {
+			// This server was known to the application,
+			// but not in the Raft config, so will be ignored
 			continue
 		}
 
@@ -258,8 +261,8 @@ func (a *Autopilot) pruneDeadServers() error {
 	servers = servers.convertFromFailedServers(failedServers)
 
 	// Curry adjudicate function
-	adjudicate := func(voterCountProvider func() int) func(RaftServers) []raft.ServerID {
-		return func(raftServers RaftServers) []raft.ServerID {
+	adjudicate := func(voterCountProvider func() int) func(RaftServerEligibility) []raft.ServerID {
+		return func(raftServers RaftServerEligibility) []raft.ServerID {
 			return a.adjudicateRemoval(voterCountProvider, raftServers)
 		}
 	}(servers.PotentialVoters)
@@ -285,7 +288,7 @@ func (a *Autopilot) pruneDeadServers() error {
 	return nil
 }
 
-func (a *Autopilot) adjudicateRemoval(voterCountProvider func() int, s RaftServers) []raft.ServerID {
+func (a *Autopilot) adjudicateRemoval(voterCountProvider func() int, s RaftServerEligibility) []raft.ServerID {
 	var ids []raft.ServerID
 	failureTolerance := (voterCountProvider() - 1) / 2
 	minQuorum := a.delegate.AutopilotConfig().MinQuorum
@@ -308,8 +311,8 @@ func (a *Autopilot) adjudicateRemoval(voterCountProvider func() int, s RaftServe
 	return ids
 }
 
-func getServerSuffrage(servers []raft.Server) RaftServers {
-	ids := make(RaftServers)
+func getServerSuffrage(servers []raft.Server) RaftServerEligibility {
+	ids := make(RaftServerEligibility)
 
 	for _, server := range servers {
 		ids[server.ID] = &VoterEligibility{

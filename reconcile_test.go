@@ -414,32 +414,32 @@ func TestPruneDeadServers(t *testing.T) {
 				},
 			},
 			expectedServers: CategorizedServers{
-				StaleNonVoters: RaftServers{
+				StaleNonVoters: RaftServerEligibility{
 					"db877f23-3e0a-4107-8ed8-bd7c3d710945": &VoterEligibility{
 						currentVoter:   false,
 						potentialVoter: false,
 					},
 				},
-				StaleVoters: RaftServers{
+				StaleVoters: RaftServerEligibility{
 					"0aacc844-1d0a-4ba7-bbc2-bd88d51cb236": &VoterEligibility{
 						currentVoter:   true,
 						potentialVoter: false,
 					},
 				},
-				FailedNonVoters: RaftServers{
+				FailedNonVoters: RaftServerEligibility{
 					"8830c599-04cc-4b28-9b75-173355d49ab7": &VoterEligibility{
 						currentVoter:   false,
 						potentialVoter: true,
 					},
 				},
-				FailedVoters: RaftServers{
+				FailedVoters: RaftServerEligibility{
 					"3857f1d4-5c23-4016-9078-fee502c0d1b4": &VoterEligibility{
 						currentVoter:   true,
 						potentialVoter: true,
 					},
 				},
-				HealthyNonVoters: RaftServers{},
-				HealthyVoters: RaftServers{
+				HealthyNonVoters: RaftServerEligibility{},
+				HealthyVoters: RaftServerEligibility{
 					"51b2d56e-816e-409a-8b8e-afef2cf49661": &VoterEligibility{
 						currentVoter:   true,
 						potentialVoter: true,
@@ -625,32 +625,32 @@ func TestPruneDeadServers(t *testing.T) {
 				},
 			},
 			expectedServers: CategorizedServers{
-				StaleNonVoters: RaftServers{
+				StaleNonVoters: RaftServerEligibility{
 					"db877f23-3e0a-4107-8ed8-bd7c3d710945": &VoterEligibility{
 						currentVoter:   false,
 						potentialVoter: false,
 					},
 				},
-				StaleVoters: RaftServers{
+				StaleVoters: RaftServerEligibility{
 					"0aacc844-1d0a-4ba7-bbc2-bd88d51cb236": &VoterEligibility{
 						currentVoter:   true,
 						potentialVoter: false,
 					},
 				},
-				FailedNonVoters: RaftServers{
+				FailedNonVoters: RaftServerEligibility{
 					"8830c599-04cc-4b28-9b75-173355d49ab7": &VoterEligibility{
 						currentVoter:   false,
 						potentialVoter: true,
 					},
 				},
-				FailedVoters: RaftServers{
+				FailedVoters: RaftServerEligibility{
 					"3857f1d4-5c23-4016-9078-fee502c0d1b4": &VoterEligibility{
 						currentVoter:   true,
 						potentialVoter: true,
 					},
 				},
-				HealthyNonVoters: RaftServers{},
-				HealthyVoters: RaftServers{
+				HealthyNonVoters: RaftServerEligibility{},
+				HealthyVoters: RaftServerEligibility{
 					"51b2d56e-816e-409a-8b8e-afef2cf49661": &VoterEligibility{
 						currentVoter:   true,
 						potentialVoter: true,
@@ -818,27 +818,27 @@ func TestPruneDeadServers(t *testing.T) {
 				},
 			},
 			expectedServers: CategorizedServers{
-				StaleNonVoters: RaftServers{
+				StaleNonVoters: RaftServerEligibility{
 					"db877f23-3e0a-4107-8ed8-bd7c3d710944": &VoterEligibility{
 						currentVoter:   false,
 						potentialVoter: false,
 					},
 				},
-				StaleVoters: RaftServers{},
-				FailedNonVoters: RaftServers{
+				StaleVoters: RaftServerEligibility{},
+				FailedNonVoters: RaftServerEligibility{
 					"8830c599-04cc-4b28-9b75-173355d49ab5": &VoterEligibility{
 						currentVoter:   false,
 						potentialVoter: true,
 					},
 				},
-				FailedVoters: RaftServers{
+				FailedVoters: RaftServerEligibility{
 					"a227f9a9-f55e-4321-b959-5afdcc63c6d3": &VoterEligibility{
 						currentVoter:   true,
 						potentialVoter: true,
 					},
 				},
-				HealthyNonVoters: RaftServers{},
-				HealthyVoters: RaftServers{
+				HealthyNonVoters: RaftServerEligibility{},
+				HealthyVoters: RaftServerEligibility{
 					"51b2d56e-816e-409a-8b8e-afef2cf49661": &VoterEligibility{
 						currentVoter:   true,
 						potentialVoter: true,
@@ -976,7 +976,7 @@ func TestPruneDeadServers(t *testing.T) {
 				},
 			},
 			expectedServers: CategorizedServers{
-				StaleNonVoters: RaftServers{
+				StaleNonVoters: RaftServerEligibility{
 					"3857f1d4-5c23-4016-9078-fee502c0d1b4": &VoterEligibility{
 						currentVoter:   false,
 						potentialVoter: false,
@@ -986,11 +986,11 @@ func TestPruneDeadServers(t *testing.T) {
 						potentialVoter: false,
 					},
 				},
-				StaleVoters:      RaftServers{},
-				FailedNonVoters:  RaftServers{},
-				FailedVoters:     RaftServers{},
-				HealthyNonVoters: RaftServers{},
-				HealthyVoters: RaftServers{
+				StaleVoters:      RaftServerEligibility{},
+				FailedNonVoters:  RaftServerEligibility{},
+				FailedVoters:     RaftServerEligibility{},
+				HealthyNonVoters: RaftServerEligibility{},
+				HealthyVoters: RaftServerEligibility{
 					"51b2d56e-816e-409a-8b8e-afef2cf49661": &VoterEligibility{
 						currentVoter:   true,
 						potentialVoter: true,

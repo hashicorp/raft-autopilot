@@ -216,7 +216,7 @@ func TestServerStabilizationTime(t *testing.T) {
 
 func TestFilterVoters(t *testing.T) {
 	type testCase struct {
-		servers     *RaftServers
+		servers     *RaftServerEligibility
 		param       bool
 		numExpected int
 		expectedIds []string
@@ -224,12 +224,12 @@ func TestFilterVoters(t *testing.T) {
 
 	cases := map[string]testCase{
 		"no-servers": {
-			servers:     &RaftServers{},
+			servers:     &RaftServerEligibility{},
 			param:       true,
 			numExpected: 0,
 		},
 		"no-current-voters-when-true-single": {
-			servers: &RaftServers{
+			servers: &RaftServerEligibility{
 				"abc123": &VoterEligibility{
 					currentVoter:   false,
 					potentialVoter: false,
@@ -239,7 +239,7 @@ func TestFilterVoters(t *testing.T) {
 			numExpected: 0,
 		},
 		"current-voters-when-true-single": {
-			servers: &RaftServers{
+			servers: &RaftServerEligibility{
 				"abc123": &VoterEligibility{
 					currentVoter:   true,
 					potentialVoter: true,
@@ -250,7 +250,7 @@ func TestFilterVoters(t *testing.T) {
 			expectedIds: []string{"abc123"},
 		},
 		"no-current-voters-when-true-multiple": {
-			servers: &RaftServers{
+			servers: &RaftServerEligibility{
 				"abc123": &VoterEligibility{
 					currentVoter:   false,
 					potentialVoter: false,
@@ -264,7 +264,7 @@ func TestFilterVoters(t *testing.T) {
 			numExpected: 0,
 		},
 		"current-voters-when-true-multiple": {
-			servers: &RaftServers{
+			servers: &RaftServerEligibility{
 				"abc123": &VoterEligibility{
 					currentVoter:   true,
 					potentialVoter: true,
@@ -279,7 +279,7 @@ func TestFilterVoters(t *testing.T) {
 			expectedIds: []string{"abc123", "def456"},
 		},
 		"non-voters-when-false-single": {
-			servers: &RaftServers{
+			servers: &RaftServerEligibility{
 				"abc123": &VoterEligibility{
 					currentVoter:   false,
 					potentialVoter: true,
@@ -318,22 +318,22 @@ func TestGetPotentialVotersFromCategorizedServers(t *testing.T) {
 		},
 		"single-one-of-each": {
 			servers: &CategorizedServers{
-				StaleNonVoters: RaftServers{
+				StaleNonVoters: RaftServerEligibility{
 					"abc": &VoterEligibility{currentVoter: false, potentialVoter: false},
 				},
-				StaleVoters: RaftServers{
+				StaleVoters: RaftServerEligibility{
 					"def": &VoterEligibility{currentVoter: true, potentialVoter: false},
 				},
-				FailedNonVoters: RaftServers{
+				FailedNonVoters: RaftServerEligibility{
 					"ghi": &VoterEligibility{currentVoter: false, potentialVoter: true},
 				},
-				FailedVoters: RaftServers{
+				FailedVoters: RaftServerEligibility{
 					"jkl": &VoterEligibility{currentVoter: false, potentialVoter: true},
 				},
-				HealthyNonVoters: RaftServers{
+				HealthyNonVoters: RaftServerEligibility{
 					"mno": &VoterEligibility{currentVoter: false, potentialVoter: true},
 				},
-				HealthyVoters: RaftServers{
+				HealthyVoters: RaftServerEligibility{
 					"pqr": &VoterEligibility{currentVoter: true, potentialVoter: true},
 				},
 			},
