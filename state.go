@@ -367,7 +367,7 @@ func buildServerState(inputs *nextStateInputs, srv raft.Server) ServerState {
 		state.Server.IsLeader = true
 	}
 
-	// override the Stats if anywhere in the fetched results
+	// override the Stats if any were in the fetched results
 	if stats, found := inputs.FetchedStats[srv.ID]; found {
 		state.Stats = *stats
 	}
