@@ -61,8 +61,8 @@ type Config struct {
 	// be behind before being considered unhealthy.
 	MaxTrailingLogs uint64
 
-	// MinQuorum sets the minimum number of servers required in a cluster
-	// before autopilot can prune dead servers.
+	// MinQuorum set the minimum number of servers that should always be present
+	// in a cluster. Autopilot will not prune servers below this number.
 	MinQuorum uint
 
 	// ServerStabilizationTime is the minimum amount of time a server must be
@@ -137,7 +137,7 @@ func (s *ServerState) isHealthy(lastTerm uint64, leaderLastIndex uint64, conf *C
 }
 
 type ServerHealth struct {
-	// Healthy is whether or not the server is healthy according to the current
+	// Healthy is whether the server is healthy according to the current
 	// Autopilot config.
 	Healthy bool
 
@@ -242,6 +242,8 @@ type RaftChanges struct {
 	Leader     raft.ServerID
 }
 
+// VoterEligibility represents whether a node can currently vote,
+// and if it could potentially vote in the future.
 type VoterEligibility struct {
 	currentVoter   bool
 	potentialVoter bool
@@ -261,6 +263,8 @@ func (v *VoterEligibility) SetPotentialVoter(isVoter bool) {
 
 type RaftServerEligibility map[raft.ServerID]*VoterEligibility
 
+// FilterVoters can be used to return all servers that are currently voters,
+// or all servers that are not.
 func (s *RaftServerEligibility) FilterVoters(isCurrentVoter bool) RaftServerEligibility {
 	servers := make(RaftServerEligibility)
 	for id, v := range *s {
@@ -292,6 +296,7 @@ type CategorizedServers struct {
 	HealthyVoters RaftServerEligibility
 }
 
+// PotentialVoters sums the number of servers that have the potential to become voters.
 func (s *CategorizedServers) PotentialVoters() int {
 	potentialVoters := 0
 
@@ -322,7 +327,7 @@ func (s *CategorizedServers) PotentialVoters() int {
 	return potentialVoters
 }
 
-// Essentially a DTO type to support the promoter
+// FailedServers is essentially a DTO to support the promoter interface
 type FailedServers struct {
 	StaleNonVoters  []raft.ServerID
 	StaleVoters     []raft.ServerID
@@ -330,6 +335,8 @@ type FailedServers struct {
 	FailedVoters    []*Server
 }
 
+// convertToFailedServers uses CategorizedServers to create the FailedServers
+// struct which can be used to maintain compatibility with the promoter interface
 func (s *CategorizedServers) convertToFailedServers(state *State) *FailedServers {
 	var failedServers FailedServers
 	var staleNonVoting []raft.ServerID
@@ -367,6 +374,8 @@ func (s *CategorizedServers) convertToFailedServers(state *State) *FailedServers
 	return &failedServers
 }
 
+// convertFromFailedServers maps stale and failed servers back to the CategorizedServers
+// struct, the healthy servers will not be modified.
 func (s *CategorizedServers) convertFromFailedServers(servers *FailedServers) *CategorizedServers {
 	staleNonVoters := make(RaftServerEligibility)
 	staleVoters := make(RaftServerEligibility)
@@ -431,7 +440,6 @@ type Promoter interface {
 	// should have their NodeType field updated
 	GetNodeTypes(*Config, *State) map[raft.ServerID]NodeType
 
-	// CalculatePromotionsAndDemotions
 	CalculatePromotionsAndDemotions(*Config, *State) RaftChanges
 
 	// FilterFailedServerRemovals takes in the current state and structure outlining all the

@@ -3,6 +3,7 @@ package autopilot
 import (
 	"fmt"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/raft"
 )
 
@@ -158,7 +159,14 @@ func (a *Autopilot) categorizeServers(voterPredicate func(NodeType) bool) (*Cate
 
 	// Get servers as raft sees them currently
 	// (we won't know if they have the potential to become voters yet)
-	raftServers := getServerSuffrage(cfg.Servers)
+	serverSuffrages := make(RaftServerEligibility)
+
+	for _, server := range cfg.Servers {
+		serverSuffrages[server.ID] = &VoterEligibility{
+			currentVoter: server.Suffrage == raft.Voter,
+		}
+	}
+
 	failedVoters := make(RaftServerEligibility)
 	failedNonVoters := make(RaftServerEligibility)
 	healthyVoters := make(RaftServerEligibility)
@@ -166,14 +174,18 @@ func (a *Autopilot) categorizeServers(voterPredicate func(NodeType) bool) (*Cate
 
 	// Loop over all the servers the application knows about
 	for id, srv := range a.delegate.KnownServers() {
-		v, found := raftServers[id]
+		v, found := serverSuffrages[id]
 		if !found {
 			// This server was known to the application,
 			// but not in the Raft config, so will be ignored
 			continue
 		}
 
-		delete(raftServers, id)
+		// This server is matched so remove it from the list and categorize it.
+		delete(serverSuffrages, id)
+
+		// Update the potential suffrage using the supplied predicate.
+		v.SetPotentialVoter(voterPredicate(srv.NodeType))
 
 		if srv.NodeStatus == NodeAlive && v.IsCurrentVoter() {
 			healthyVoters[id] = v
@@ -184,13 +196,13 @@ func (a *Autopilot) categorizeServers(voterPredicate func(NodeType) bool) (*Cate
 		} else {
 			failedNonVoters[id] = v
 		}
-
-		v.SetPotentialVoter(voterPredicate(srv.NodeType))
 	}
 
+	// Create and return the full set of categorized servers (including ones that
+	// only the Raft configuration knows about, i.e. stale servers).
 	c := &CategorizedServers{
-		StaleNonVoters:   raftServers.FilterVoters(false),
-		StaleVoters:      raftServers.FilterVoters(true),
+		StaleNonVoters:   serverSuffrages.FilterVoters(false),
+		StaleVoters:      serverSuffrages.FilterVoters(true),
 		FailedNonVoters:  failedNonVoters,
 		FailedVoters:     failedVoters,
 		HealthyNonVoters: healthyNonVoters,
@@ -204,10 +216,7 @@ func (a *Autopilot) RemoveStaleServer(id raft.ServerID) error {
 	a.logger.Debug("removing server by ID", "id", id)
 	future := a.raft.RemoveServer(id, 0, 0)
 	if err := future.Error(); err != nil {
-		a.logger.Error("failed to remove raft server",
-			"id", id,
-			"error", err,
-		)
+		a.logger.Error("failed to remove raft server", "id", id, "error", err)
 		return err
 	}
 	a.logger.Info("removed server", "id", id)
@@ -215,26 +224,21 @@ func (a *Autopilot) RemoveStaleServer(id raft.ServerID) error {
 }
 
 func (a *Autopilot) RemoveStaleServers(toRemove []raft.ServerID) error {
+	var result error
+
 	for _, id := range toRemove {
 		err := a.RemoveStaleServer(id)
 		if err != nil {
-			return err
+			result = multierror.Append(result, err)
 		}
 	}
 
-	return nil
-}
-
-func (a *Autopilot) RemoveFailedServer(id raft.ServerID) {
-	srv, found := a.delegate.KnownServers()[id]
-	if found {
-		a.delegate.RemoveFailedServer(srv)
-	}
+	return result
 }
 
 func (a *Autopilot) RemoveFailedServers(toRemove []raft.ServerID) {
 	for _, id := range toRemove {
-		a.RemoveFailedServer(id)
+		a.delegate.RemoveFailedServer(a.delegate.KnownServers()[id])
 	}
 }
 
@@ -260,35 +264,28 @@ func (a *Autopilot) pruneDeadServers() error {
 	failedServers = a.promoter.FilterFailedServerRemovals(conf, state, failedServers)
 	servers = servers.convertFromFailedServers(failedServers)
 
-	// Curry adjudicate function
-	adjudicate := func(voterCountProvider func() int) func(RaftServerEligibility) []raft.ServerID {
-		return func(raftServers RaftServerEligibility) []raft.ServerID {
-			return a.adjudicateRemoval(voterCountProvider, raftServers)
-		}
-	}(servers.PotentialVoters)
-
-	// Try to remove servers in order of increasing precedence
+	// Try to remove servers in order of increasing precedence...
 
 	// Remove all stale non-voters
-	if err = a.RemoveStaleServers(adjudicate(servers.StaleNonVoters)); err != nil {
+	if err = a.RemoveStaleServers(a.adjudicateRemoval(servers.StaleNonVoters, servers.PotentialVoters)); err != nil {
 		return err
 	}
 
 	// Remove stale voters
-	if err = a.RemoveStaleServers(adjudicate(servers.StaleVoters)); err != nil {
+	if err = a.RemoveStaleServers(a.adjudicateRemoval(servers.StaleVoters, servers.PotentialVoters)); err != nil {
 		return err
 	}
 
 	// Remove failed non-voters
-	a.RemoveFailedServers(adjudicate(servers.FailedNonVoters))
+	a.RemoveFailedServers(a.adjudicateRemoval(servers.FailedNonVoters, servers.PotentialVoters))
 
 	// Remove failed voters
-	a.RemoveFailedServers(adjudicate(servers.FailedVoters))
+	a.RemoveFailedServers(a.adjudicateRemoval(servers.FailedVoters, servers.PotentialVoters))
 
 	return nil
 }
 
-func (a *Autopilot) adjudicateRemoval(voterCountProvider func() int, s RaftServerEligibility) []raft.ServerID {
+func (a *Autopilot) adjudicateRemoval(s RaftServerEligibility, voterCountProvider func() int) []raft.ServerID {
 	var ids []raft.ServerID
 	failureTolerance := (voterCountProvider() - 1) / 2
 	minQuorum := a.delegate.AutopilotConfig().MinQuorum
