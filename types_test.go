@@ -305,7 +305,6 @@ func TestFilterVoters(t *testing.T) {
 }
 
 func TestGetPotentialVotersFromCategorizedServers(t *testing.T) {
-	//func (s *CategorizedServers) PotentialVoters() int {
 	type testCase struct {
 		servers     *CategorizedServers
 		numExpected int

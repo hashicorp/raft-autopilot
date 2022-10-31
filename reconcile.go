@@ -212,7 +212,7 @@ func (a *Autopilot) categorizeServers(voterPredicate func(NodeType) bool) (*Cate
 	return c, nil
 }
 
-func (a *Autopilot) RemoveStaleServer(id raft.ServerID) error {
+func (a *Autopilot) removeStaleServer(id raft.ServerID) error {
 	a.logger.Debug("removing server by ID", "id", id)
 	future := a.raft.RemoveServer(id, 0, 0)
 	if err := future.Error(); err != nil {
@@ -223,11 +223,11 @@ func (a *Autopilot) RemoveStaleServer(id raft.ServerID) error {
 	return nil
 }
 
-func (a *Autopilot) RemoveStaleServers(toRemove []raft.ServerID) error {
+func (a *Autopilot) removeStaleServers(toRemove []raft.ServerID) error {
 	var result error
 
 	for _, id := range toRemove {
-		err := a.RemoveStaleServer(id)
+		err := a.removeStaleServer(id)
 		if err != nil {
 			result = multierror.Append(result, err)
 		}
@@ -236,7 +236,7 @@ func (a *Autopilot) RemoveStaleServers(toRemove []raft.ServerID) error {
 	return result
 }
 
-func (a *Autopilot) RemoveFailedServers(toRemove []raft.ServerID) {
+func (a *Autopilot) removeFailedServers(toRemove []raft.ServerID) {
 	for _, id := range toRemove {
 		a.delegate.RemoveFailedServer(a.delegate.KnownServers()[id])
 	}
@@ -267,20 +267,20 @@ func (a *Autopilot) pruneDeadServers() error {
 	// Try to remove servers in order of increasing precedence...
 
 	// Remove all stale non-voters
-	if err = a.RemoveStaleServers(a.adjudicateRemoval(servers.StaleNonVoters, servers.PotentialVoters)); err != nil {
+	if err = a.removeStaleServers(a.adjudicateRemoval(servers.StaleNonVoters, servers.PotentialVoters)); err != nil {
 		return err
 	}
 
 	// Remove stale voters
-	if err = a.RemoveStaleServers(a.adjudicateRemoval(servers.StaleVoters, servers.PotentialVoters)); err != nil {
+	if err = a.removeStaleServers(a.adjudicateRemoval(servers.StaleVoters, servers.PotentialVoters)); err != nil {
 		return err
 	}
 
 	// Remove failed non-voters
-	a.RemoveFailedServers(a.adjudicateRemoval(servers.FailedNonVoters, servers.PotentialVoters))
+	a.removeFailedServers(a.adjudicateRemoval(servers.FailedNonVoters, servers.PotentialVoters))
 
 	// Remove failed voters
-	a.RemoveFailedServers(a.adjudicateRemoval(servers.FailedVoters, servers.PotentialVoters))
+	a.removeFailedServers(a.adjudicateRemoval(servers.FailedVoters, servers.PotentialVoters))
 
 	return nil
 }
