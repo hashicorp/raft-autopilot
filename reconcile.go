@@ -293,8 +293,8 @@ func (a *Autopilot) adjudicateRemoval(s RaftServerEligibility, voterCountProvide
 	for id, v := range s {
 		if v != nil && v.IsPotentialVoter() && voterCountProvider()-1 < int(minQuorum) {
 			a.logger.Debug("will not remove server node as it would leave less voters than the minimum number allowed", "id", id, "min", minQuorum)
-		} else if failureTolerance < 1 {
-			a.logger.Debug("will not remove server node as removal of a majority of servers is not safe", "id", id)
+		} else if v.IsCurrentVoter() && failureTolerance < 1 {
+			a.logger.Debug("will not remove server node as removal of a majority of voting servers is not safe", "id", id)
 		} else if v != nil && v.IsCurrentVoter() {
 			failureTolerance--
 			delete(s, id)
@@ -302,18 +302,6 @@ func (a *Autopilot) adjudicateRemoval(s RaftServerEligibility, voterCountProvide
 		} else {
 			delete(s, id)
 			ids = append(ids, id)
-		}
-	}
-
-	return ids
-}
-
-func getServerSuffrage(servers []raft.Server) RaftServerEligibility {
-	ids := make(RaftServerEligibility)
-
-	for _, server := range servers {
-		ids[server.ID] = &VoterEligibility{
-			currentVoter: server.Suffrage == raft.Voter,
 		}
 	}
 
