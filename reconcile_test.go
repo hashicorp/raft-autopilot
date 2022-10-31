@@ -948,7 +948,8 @@ func TestPruneDeadServers(t *testing.T) {
 			},
 		},
 		"stale-non-voters": {
-			// 2 working nodes and 2 stale servers - shouldn't remove anything
+			// 2 working nodes and 2 stale servers - should only remove stale
+			// non-voter and refuse to remove anything else
 			raftConfig: raft.Configuration{
 				Servers: []raft.Server{
 					{
@@ -961,13 +962,13 @@ func TestPruneDeadServers(t *testing.T) {
 						ID:       "51fb4248-be6a-43e5-b47f-c089818e2012",
 						Address:  "198.18.0.2:8300",
 					},
-					// this is going to be our stale non-voter
+					// this is going to be our stale voter
 					{
-						Suffrage: raft.Nonvoter,
+						Suffrage: raft.Voter,
 						ID:       "3857f1d4-5c23-4016-9078-fee502c0d1b4",
 						Address:  "198.18.0.4:8300",
 					},
-					// this is going to be our stale non-voter (2)
+					// this is going to be our stale non-voter
 					{
 						Suffrage: raft.Nonvoter,
 						ID:       "db877f23-3e0a-4107-8ed8-bd7c3d710945",
@@ -977,16 +978,17 @@ func TestPruneDeadServers(t *testing.T) {
 			},
 			expectedServers: CategorizedServers{
 				StaleNonVoters: RaftServerEligibility{
-					"3857f1d4-5c23-4016-9078-fee502c0d1b4": &VoterEligibility{
-						currentVoter:   false,
-						potentialVoter: false,
-					},
 					"db877f23-3e0a-4107-8ed8-bd7c3d710945": {
 						currentVoter:   false,
 						potentialVoter: false,
 					},
 				},
-				StaleVoters:      RaftServerEligibility{},
+				StaleVoters: RaftServerEligibility{
+					"3857f1d4-5c23-4016-9078-fee502c0d1b4": &VoterEligibility{
+						currentVoter:   false,
+						potentialVoter: false,
+					},
+				},
 				FailedNonVoters:  RaftServerEligibility{},
 				FailedVoters:     RaftServerEligibility{},
 				HealthyNonVoters: RaftServerEligibility{},
@@ -1061,7 +1063,15 @@ func TestPruneDeadServers(t *testing.T) {
 					},
 				},
 			},
-			setupExpectations: func(mraft *MockRaft, mapp *MockApplicationIntegration) {},
+			//setupExpectations: func(mraft *MockRaft, mapp *MockApplicationIntegration) {},
+			setupExpectations: func(mraft *MockRaft, mapp *MockApplicationIntegration) {
+				// Stale non-voter
+				mraft.On("RemoveServer",
+					raft.ServerID("db877f23-3e0a-4107-8ed8-bd7c3d710945"),
+					uint64(0),
+					time.Duration(0),
+				).Return(&raftIndexFuture{}).Once()
+			},
 		},
 	}
 
