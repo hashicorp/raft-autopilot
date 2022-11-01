@@ -22,7 +22,7 @@ func (a *Autopilot) reconcile() error {
 	state := a.GetState()
 
 	if state == nil || state.Leader == "" {
-		return fmt.Errorf("Cannote reconcile Raft server voting rights without a valid autopilot state")
+		return fmt.Errorf("cannot reconcile Raft server voting rights without a valid autopilot state")
 	}
 
 	// have the promoter calculate the required Raft changeset.
@@ -220,7 +220,7 @@ func (a *Autopilot) getFailedServers() (*FailedServers, int, error) {
 // removed first. Then stale voters and finally failed servers. For servers with voting rights we will
 // cap the number removed so that we do not remove too many at a time and do not remove nodes to the
 // point where the number of voters would be below the MinQuorum value from the autopilot config.
-// Additionally the delegate will be consulted to determine if all of the removals should be done and
+// Additionally, the delegate will be consulted to determine if all the removals should be done and
 // can filter the failed servers listings if need be.
 func (a *Autopilot) pruneDeadServers() error {
 	if !a.ReconciliationEnabled() {
@@ -241,7 +241,7 @@ func (a *Autopilot) pruneDeadServers() error {
 
 	failed = a.promoter.FilterFailedServerRemovals(conf, state, failed)
 
-	// remove failed non voting servers
+	// remove failed non-voting servers
 	for _, srv := range failed.FailedNonVoters {
 		a.logger.Info("Attempting removal of failed server node", "id", srv.ID, "name", srv.Name, "address", srv.Address)
 		a.delegate.RemoveFailedServer(srv)

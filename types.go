@@ -137,7 +137,7 @@ func (s *ServerState) isHealthy(lastTerm uint64, leaderLastIndex uint64, conf *C
 }
 
 type ServerHealth struct {
-	// Healthy is whether or not the server is healthy according to the current
+	// Healthy is whether the server is healthy according to the current
 	// Autopilot config.
 	Healthy bool
 
