@@ -291,6 +291,10 @@ type Promoter interface {
 	// failed/stale servers and will return those failed servers which the promoter thinks
 	// should be allowed to be removed.
 	FilterFailedServerRemovals(*Config, *State, *FailedServers) *FailedServers
+
+	// PotentialVoterPredicate takes a NodeType and returns whether that type represents
+	// a potential voter, based on a predicate implemented by the promoter.
+	PotentialVoterPredicate(NodeType) bool
 }
 
 // TimeProvider is an interface for getting a local time. This is mainly useful for testing
@@ -303,4 +307,90 @@ type runtimeTimeProvider struct{}
 
 func (_ *runtimeTimeProvider) Now() time.Time {
 	return time.Now()
+}
+
+func (v *VoterEligibility) IsCurrentVoter() bool {
+	return v.currentVoter
+}
+
+func (v *VoterEligibility) IsPotentialVoter() bool {
+	return v.potentialVoter
+}
+
+func (v *VoterEligibility) SetPotentialVoter(isVoter bool) {
+	v.potentialVoter = isVoter
+}
+
+// VoterEligibility represents whether a node can currently vote,
+// and if it could potentially vote in the future.
+type VoterEligibility struct {
+	currentVoter   bool
+	potentialVoter bool
+}
+
+type VoterRegistry map[raft.ServerID]*VoterEligibility
+
+func (vr *VoterRegistry) PotentialVoters() int {
+	potentialVoters := 0
+
+	for _, v := range *vr {
+		if v.IsPotentialVoter() {
+			potentialVoters++
+		}
+	}
+
+	return potentialVoters
+}
+
+func (vr *VoterRegistry) FilterStale(ids []raft.ServerID) VoterRegistry {
+	result := make(VoterRegistry)
+
+	for _, id := range ids {
+		if ve, ok := (*vr)[id]; ok {
+			result[id] = ve
+		}
+	}
+
+	return result
+}
+
+func (vr *VoterRegistry) FilterFailed(ids []*Server) VoterRegistry {
+	result := make(VoterRegistry)
+
+	for _, srv := range ids {
+		if ve, ok := (*vr)[srv.ID]; ok {
+			result[srv.ID] = ve
+		}
+	}
+
+	return result
+}
+
+func (f *FailedServers) Get(ids []raft.ServerID, isVoter bool) []*Server {
+	var servers []*Server
+	var result []*Server
+
+	if isVoter {
+		servers = f.FailedVoters
+	} else {
+		servers = f.FailedNonVoters
+	}
+
+	for _, id := range ids {
+		for _, srv := range servers {
+			if srv.ID == id {
+				result = append(result, srv)
+			}
+		}
+	}
+
+	return result
+}
+
+func (vr *VoterRegistry) Remove(ids []raft.ServerID) *VoterRegistry {
+	for _, id := range ids {
+		delete(*vr, id)
+	}
+
+	return vr
 }
