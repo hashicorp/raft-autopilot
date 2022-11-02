@@ -291,10 +291,7 @@ func (a *Autopilot) adjudicateRemoval(ids []raft.ServerID, vr *voterRegistry) []
 	minQuorum := a.delegate.AutopilotConfig().MinQuorum
 
 	for _, id := range ids {
-		v, found := vr.eligibility[id]
-		if !found {
-
-		}
+		v := vr.eligibility[id]
 
 		if v != nil && v.isPotentialVoter() && initialPotentialVoters-removedPotentialVoters-1 < int(minQuorum) {
 			a.logger.Debug("will not remove server node as it would leave less voters than the minimum number allowed", "id", id, "min", minQuorum)
