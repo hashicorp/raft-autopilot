@@ -187,7 +187,7 @@ func (a *Autopilot) getFailedServers() (*FailedServers, VoterRegistry, error) {
 		}
 
 		// Update the potential suffrage using the supplied predicate.
-		v, _ := registry[id]
+		v := registry[id]
 		v.SetPotentialVoter(a.promoter.PotentialVoterPredicate(srv.NodeType))
 
 		if srv.NodeStatus != NodeAlive {
