@@ -251,6 +251,9 @@ func (a *Autopilot) pruneDeadServers() error {
 
 	failed = a.promoter.FilterFailedServerRemovals(conf, state, failed)
 
+	// Remove servers in order of increasing precedence
+	// Update the voter registry after each batch is processed
+
 	// remove stale non-voters
 	toRemove := a.adjudicateRemoval(failed.StaleNonVoters, vr)
 	if err = a.removeStaleServers(toRemove); err != nil {
@@ -282,7 +285,9 @@ func (a *Autopilot) pruneDeadServers() error {
 
 func (a *Autopilot) adjudicateRemoval(ids []raft.ServerID, vr *VoterRegistry) []raft.ServerID {
 	var result []raft.ServerID
-	maxRemoval := (vr.PotentialVoters() - 1) / 2
+	initialPotentialVoters := vr.PotentialVoters()
+	removedPotentialVoters := 0
+	maxRemoval := (initialPotentialVoters - 1) / 2
 	minQuorum := a.delegate.AutopilotConfig().MinQuorum
 
 	for _, id := range ids {
@@ -291,17 +296,17 @@ func (a *Autopilot) adjudicateRemoval(ids []raft.ServerID, vr *VoterRegistry) []
 
 		}
 
-		if v != nil && v.IsPotentialVoter() && vr.PotentialVoters()-1 < int(minQuorum) {
+		if v != nil && v.IsPotentialVoter() && initialPotentialVoters-removedPotentialVoters-1 < int(minQuorum) {
 			a.logger.Debug("will not remove server node as it would leave less voters than the minimum number allowed", "id", id, "min", minQuorum)
 		} else if v.IsCurrentVoter() && maxRemoval < 1 {
 			a.logger.Debug("will not remove server node as removal of a majority of voting servers is not safe", "id", id)
 		} else if v != nil && v.IsCurrentVoter() {
 			maxRemoval--
-			// We need to update the removal in the registry so the next call for potential voters is accurate
-			vr.Remove(id)
+			// We need to track how many voters we have removed from the registry
+			// to ensure the total remaining potential voters is accurate
+			removedPotentialVoters++
 			result = append(result, id)
 		} else {
-			delete(vr.Eligibility, id)
 			result = append(result, id)
 		}
 	}
