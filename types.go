@@ -258,6 +258,27 @@ type FailedServers struct {
 	FailedVoters []*Server
 }
 
+func (f *FailedServers) GetFailed(ids []raft.ServerID, isVoter bool) []*Server {
+	var servers []*Server
+	var result []*Server
+
+	if isVoter {
+		servers = f.FailedVoters
+	} else {
+		servers = f.FailedNonVoters
+	}
+
+	for _, id := range ids {
+		for _, srv := range servers {
+			if srv.ID == id {
+				result = append(result, srv)
+			}
+		}
+	}
+
+	return result
+}
+
 // Promoter is an interface to provide promotion/demotion algorithms to the core autopilot type.
 // The BasicPromoter satisfies this interface and will promote any stable servers but other
 // algorithms could be implemented. The implementation of these methods shouldn't "block".
@@ -292,9 +313,9 @@ type Promoter interface {
 	// should be allowed to be removed.
 	FilterFailedServerRemovals(*Config, *State, *FailedServers) *FailedServers
 
-	// PotentialVoterPredicate takes a NodeType and returns whether that type represents
+	// IsPotentialVoter takes a NodeType and returns whether that type represents
 	// a potential voter, based on a predicate implemented by the promoter.
-	PotentialVoterPredicate(NodeType) bool
+	IsPotentialVoter(NodeType) bool
 }
 
 // TimeProvider is an interface for getting a local time. This is mainly useful for testing
@@ -328,12 +349,20 @@ type VoterEligibility struct {
 	potentialVoter bool
 }
 
-type VoterRegistry map[raft.ServerID]*VoterEligibility
+type VoterRegistry struct {
+	Eligibility map[raft.ServerID]*VoterEligibility
+}
+
+func NewVoterRegistry() *VoterRegistry {
+	var result VoterRegistry
+	result.Eligibility = make(map[raft.ServerID]*VoterEligibility)
+	return &result
+}
 
 func (vr *VoterRegistry) PotentialVoters() int {
 	potentialVoters := 0
 
-	for _, v := range *vr {
+	for _, v := range vr.Eligibility {
 		if v.IsPotentialVoter() {
 			potentialVoters++
 		}
@@ -342,55 +371,28 @@ func (vr *VoterRegistry) PotentialVoters() int {
 	return potentialVoters
 }
 
-func (vr *VoterRegistry) FilterStale(ids []raft.ServerID) VoterRegistry {
-	result := make(VoterRegistry)
-
-	for _, id := range ids {
-		if ve, ok := (*vr)[id]; ok {
-			result[id] = ve
-		}
-	}
-
-	return result
-}
-
-func (vr *VoterRegistry) FilterFailed(ids []*Server) VoterRegistry {
-	result := make(VoterRegistry)
+func (vr *VoterRegistry) Filter(ids []*Server) []raft.ServerID {
+	var result []raft.ServerID
 
 	for _, srv := range ids {
-		if ve, ok := (*vr)[srv.ID]; ok {
-			result[srv.ID] = ve
+		if _, ok := vr.Eligibility[srv.ID]; ok {
+			result = append(result, srv.ID)
 		}
 	}
 
 	return result
 }
 
-func (f *FailedServers) Get(ids []raft.ServerID, isVoter bool) []*Server {
-	var servers []*Server
-	var result []*Server
-
-	if isVoter {
-		servers = f.FailedVoters
-	} else {
-		servers = f.FailedNonVoters
-	}
-
+func (vr *VoterRegistry) RemoveAll(ids []raft.ServerID) *VoterRegistry {
 	for _, id := range ids {
-		for _, srv := range servers {
-			if srv.ID == id {
-				result = append(result, srv)
-			}
-		}
+		vr.Remove(id)
 	}
 
-	return result
+	return vr
 }
 
-func (vr *VoterRegistry) Remove(ids []raft.ServerID) *VoterRegistry {
-	for _, id := range ids {
-		delete(*vr, id)
-	}
+func (vr *VoterRegistry) Remove(id raft.ServerID) *VoterRegistry {
+	delete(vr.Eligibility, id)
 
 	return vr
 }

@@ -156,7 +156,7 @@ func (a *Autopilot) applyDemotions(state *State, changes RaftChanges) (bool, err
 // a failed/left state (indicated by the NodeStatus field on the Server type) as well as stale servers that are
 // in the raft configuration but not know to the consuming application. This function will do nothing with
 // that information and is purely to collect the data.
-func (a *Autopilot) getFailedServers() (*FailedServers, VoterRegistry, error) {
+func (a *Autopilot) getFailedServers() (*FailedServers, *VoterRegistry, error) {
 	staleRaftServers := make(map[raft.ServerID]raft.Server)
 	raftConfig, err := a.getRaftConfiguration()
 	if err != nil {
@@ -166,10 +166,11 @@ func (a *Autopilot) getFailedServers() (*FailedServers, VoterRegistry, error) {
 	// Populate a map of all the raft servers. We will
 	// remove some later on from the map leaving us with
 	// just the stale servers.
-	registry := make(VoterRegistry)
+	registry := NewVoterRegistry()
+
 	for _, server := range raftConfig.Servers {
 		staleRaftServers[server.ID] = server
-		registry[server.ID] = &VoterEligibility{
+		registry.Eligibility[server.ID] = &VoterEligibility{
 			currentVoter: server.Suffrage == raft.Voter,
 		}
 	}
@@ -187,8 +188,8 @@ func (a *Autopilot) getFailedServers() (*FailedServers, VoterRegistry, error) {
 		}
 
 		// Update the potential suffrage using the supplied predicate.
-		v := registry[id]
-		v.SetPotentialVoter(a.promoter.PotentialVoterPredicate(srv.NodeType))
+		v := registry.Eligibility[id]
+		v.SetPotentialVoter(a.promoter.IsPotentialVoter(srv.NodeType))
 
 		if srv.NodeStatus != NodeAlive {
 			if found && raftSrv.Suffrage == raft.Voter {
@@ -251,57 +252,61 @@ func (a *Autopilot) pruneDeadServers() error {
 	failed = a.promoter.FilterFailedServerRemovals(conf, state, failed)
 
 	// remove stale non-voters
-	staleNonVoters := vr.FilterStale(failed.StaleNonVoters)
-	toRemove := a.adjudicateRemoval(staleNonVoters, vr.PotentialVoters)
+	toRemove := a.adjudicateRemoval(failed.StaleNonVoters, vr)
 	if err = a.removeStaleServers(toRemove); err != nil {
 		return err
 	}
-	vr.Remove(toRemove)
+	vr.RemoveAll(toRemove)
 
 	// Remove stale voters
-	staleVoters := vr.FilterStale(failed.StaleVoters)
-	toRemove = a.adjudicateRemoval(staleVoters, vr.PotentialVoters)
+	toRemove = a.adjudicateRemoval(failed.StaleVoters, vr)
 	if err = a.removeStaleServers(toRemove); err != nil {
 		return err
 	}
-	vr.Remove(toRemove)
+	vr.RemoveAll(toRemove)
 
 	// remove failed non-voters
-	failedNonVoters := vr.FilterFailed(failed.FailedNonVoters)
-	toRemove = a.adjudicateRemoval(failedNonVoters, vr.PotentialVoters)
-	a.removeFailedServers(failed.Get(toRemove, false))
-	vr.Remove(toRemove)
+	failedNonVoters := vr.Filter(failed.FailedNonVoters)
+	toRemove = a.adjudicateRemoval(failedNonVoters, vr)
+	a.removeFailedServers(failed.GetFailed(toRemove, false))
+	vr.RemoveAll(toRemove)
 
 	// remove failed voters
-	failedVoters := vr.FilterFailed(failed.FailedVoters)
-	toRemove = a.adjudicateRemoval(failedVoters, vr.PotentialVoters)
-	a.removeFailedServers(failed.Get(toRemove, true))
-	vr.Remove(toRemove)
+	failedVoters := vr.Filter(failed.FailedVoters)
+	toRemove = a.adjudicateRemoval(failedVoters, vr)
+	a.removeFailedServers(failed.GetFailed(toRemove, true))
+	vr.RemoveAll(toRemove)
 
 	return nil
 }
 
-func (a *Autopilot) adjudicateRemoval(s VoterRegistry, voterCountProvider func() int) []raft.ServerID {
-	var ids []raft.ServerID
-	maxRemoval := (voterCountProvider() - 1) / 2
+func (a *Autopilot) adjudicateRemoval(ids []raft.ServerID, vr *VoterRegistry) []raft.ServerID {
+	var result []raft.ServerID
+	maxRemoval := (vr.PotentialVoters() - 1) / 2
 	minQuorum := a.delegate.AutopilotConfig().MinQuorum
 
-	for id, v := range s {
-		if v != nil && v.IsPotentialVoter() && voterCountProvider()-1 < int(minQuorum) {
+	for _, id := range ids {
+		v, found := vr.Eligibility[id]
+		if !found {
+
+		}
+
+		if v != nil && v.IsPotentialVoter() && vr.PotentialVoters()-1 < int(minQuorum) {
 			a.logger.Debug("will not remove server node as it would leave less voters than the minimum number allowed", "id", id, "min", minQuorum)
 		} else if v.IsCurrentVoter() && maxRemoval < 1 {
 			a.logger.Debug("will not remove server node as removal of a majority of voting servers is not safe", "id", id)
 		} else if v != nil && v.IsCurrentVoter() {
 			maxRemoval--
-			delete(s, id)
-			ids = append(ids, id)
+			// We need to update the removal in the registry so the next call for potential voters is accurate
+			vr.Remove(id)
+			result = append(result, id)
 		} else {
-			delete(s, id)
-			ids = append(ids, id)
+			delete(vr.Eligibility, id)
+			result = append(result, id)
 		}
 	}
 
-	return ids
+	return result
 }
 
 func (a *Autopilot) removeStaleServer(id raft.ServerID) error {
@@ -332,18 +337,4 @@ func (a *Autopilot) removeFailedServers(toRemove []*Server) {
 	for _, srv := range toRemove {
 		a.delegate.RemoveFailedServer(srv)
 	}
-}
-
-func Remove(removeFrom []raft.ServerID, toRemove []raft.ServerID) []raft.ServerID {
-	var result []raft.ServerID
-
-	for _, toRemoveId := range toRemove {
-		for i, id := range removeFrom {
-			if removeFrom[i] != toRemoveId {
-				result = append(result, id)
-			}
-		}
-	}
-
-	return result
 }

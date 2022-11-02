@@ -90,8 +90,8 @@ func (_m *MockPromoter) GetStateExt(_a0 *Config, _a1 *State) interface{} {
 	return r0
 }
 
-// PotentialVoterPredicate provides a mock function with given fields: _a0
-func (_m *MockPromoter) PotentialVoterPredicate(_a0 NodeType) bool {
+// IsPotentialVoter provides a mock function with given fields: _a0
+func (_m *MockPromoter) IsPotentialVoter(_a0 NodeType) bool {
 	ret := _m.Called(_a0)
 
 	var r0 bool
