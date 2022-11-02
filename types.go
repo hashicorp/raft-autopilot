@@ -258,7 +258,7 @@ type FailedServers struct {
 	FailedVoters []*Server
 }
 
-func (f *FailedServers) GetFailed(ids []raft.ServerID, isVoter bool) []*Server {
+func (f *FailedServers) getFailed(ids []raft.ServerID, isVoter bool) []*Server {
 	var servers []*Server
 	var result []*Server
 
@@ -330,40 +330,40 @@ func (_ *runtimeTimeProvider) Now() time.Time {
 	return time.Now()
 }
 
-func (v *VoterEligibility) IsCurrentVoter() bool {
+func (v *voterEligibility) isCurrentVoter() bool {
 	return v.currentVoter
 }
 
-func (v *VoterEligibility) IsPotentialVoter() bool {
+func (v *voterEligibility) isPotentialVoter() bool {
 	return v.potentialVoter
 }
 
-func (v *VoterEligibility) SetPotentialVoter(isVoter bool) {
+func (v *voterEligibility) setPotentialVoter(isVoter bool) {
 	v.potentialVoter = isVoter
 }
 
-// VoterEligibility represents whether a node can currently vote,
+// voterEligibility represents whether a node can currently vote,
 // and if it could potentially vote in the future.
-type VoterEligibility struct {
+type voterEligibility struct {
 	currentVoter   bool
 	potentialVoter bool
 }
 
-type VoterRegistry struct {
-	Eligibility map[raft.ServerID]*VoterEligibility
+type voterRegistry struct {
+	eligibility map[raft.ServerID]*voterEligibility
 }
 
-func NewVoterRegistry() *VoterRegistry {
-	var result VoterRegistry
-	result.Eligibility = make(map[raft.ServerID]*VoterEligibility)
+func newVoterRegistry() *voterRegistry {
+	var result voterRegistry
+	result.eligibility = make(map[raft.ServerID]*voterEligibility)
 	return &result
 }
 
-func (vr *VoterRegistry) PotentialVoters() int {
+func (vr *voterRegistry) potentialVoters() int {
 	potentialVoters := 0
 
-	for _, v := range vr.Eligibility {
-		if v.IsPotentialVoter() {
+	for _, v := range vr.eligibility {
+		if v.isPotentialVoter() {
 			potentialVoters++
 		}
 	}
@@ -371,11 +371,11 @@ func (vr *VoterRegistry) PotentialVoters() int {
 	return potentialVoters
 }
 
-func (vr *VoterRegistry) Filter(ids []*Server) []raft.ServerID {
+func (vr *voterRegistry) filter(ids []*Server) []raft.ServerID {
 	var result []raft.ServerID
 
 	for _, srv := range ids {
-		if _, ok := vr.Eligibility[srv.ID]; ok {
+		if _, ok := vr.eligibility[srv.ID]; ok {
 			result = append(result, srv.ID)
 		}
 	}
@@ -383,16 +383,16 @@ func (vr *VoterRegistry) Filter(ids []*Server) []raft.ServerID {
 	return result
 }
 
-func (vr *VoterRegistry) RemoveAll(ids []raft.ServerID) *VoterRegistry {
+func (vr *voterRegistry) removeAll(ids []raft.ServerID) *voterRegistry {
 	for _, id := range ids {
-		vr.Remove(id)
+		vr.remove(id)
 	}
 
 	return vr
 }
 
-func (vr *VoterRegistry) Remove(id raft.ServerID) *VoterRegistry {
-	delete(vr.Eligibility, id)
+func (vr *voterRegistry) remove(id raft.ServerID) *voterRegistry {
+	delete(vr.eligibility, id)
 
 	return vr
 }

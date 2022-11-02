@@ -156,7 +156,7 @@ func (a *Autopilot) applyDemotions(state *State, changes RaftChanges) (bool, err
 // a failed/left state (indicated by the NodeStatus field on the Server type) as well as stale servers that are
 // in the raft configuration but not know to the consuming application. This function will do nothing with
 // that information and is purely to collect the data.
-func (a *Autopilot) getFailedServers() (*FailedServers, *VoterRegistry, error) {
+func (a *Autopilot) getFailedServers() (*FailedServers, *voterRegistry, error) {
 	staleRaftServers := make(map[raft.ServerID]raft.Server)
 	raftConfig, err := a.getRaftConfiguration()
 	if err != nil {
@@ -166,11 +166,11 @@ func (a *Autopilot) getFailedServers() (*FailedServers, *VoterRegistry, error) {
 	// Populate a map of all the raft servers. We will
 	// remove some later on from the map leaving us with
 	// just the stale servers.
-	registry := NewVoterRegistry()
+	registry := newVoterRegistry()
 
 	for _, server := range raftConfig.Servers {
 		staleRaftServers[server.ID] = server
-		registry.Eligibility[server.ID] = &VoterEligibility{
+		registry.eligibility[server.ID] = &voterEligibility{
 			currentVoter: server.Suffrage == raft.Voter,
 		}
 	}
@@ -188,8 +188,8 @@ func (a *Autopilot) getFailedServers() (*FailedServers, *VoterRegistry, error) {
 		}
 
 		// Update the potential suffrage using the supplied predicate.
-		v := registry.Eligibility[id]
-		v.SetPotentialVoter(a.promoter.IsPotentialVoter(srv.NodeType))
+		v := registry.eligibility[id]
+		v.setPotentialVoter(a.promoter.IsPotentialVoter(srv.NodeType))
 
 		if srv.NodeStatus != NodeAlive {
 			if found && raftSrv.Suffrage == raft.Voter {
@@ -259,48 +259,48 @@ func (a *Autopilot) pruneDeadServers() error {
 	if err = a.removeStaleServers(toRemove); err != nil {
 		return err
 	}
-	vr.RemoveAll(toRemove)
+	vr.removeAll(toRemove)
 
 	// Remove stale voters
 	toRemove = a.adjudicateRemoval(failed.StaleVoters, vr)
 	if err = a.removeStaleServers(toRemove); err != nil {
 		return err
 	}
-	vr.RemoveAll(toRemove)
+	vr.removeAll(toRemove)
 
 	// remove failed non-voters
-	failedNonVoters := vr.Filter(failed.FailedNonVoters)
+	failedNonVoters := vr.filter(failed.FailedNonVoters)
 	toRemove = a.adjudicateRemoval(failedNonVoters, vr)
-	a.removeFailedServers(failed.GetFailed(toRemove, false))
-	vr.RemoveAll(toRemove)
+	a.removeFailedServers(failed.getFailed(toRemove, false))
+	vr.removeAll(toRemove)
 
 	// remove failed voters
-	failedVoters := vr.Filter(failed.FailedVoters)
+	failedVoters := vr.filter(failed.FailedVoters)
 	toRemove = a.adjudicateRemoval(failedVoters, vr)
-	a.removeFailedServers(failed.GetFailed(toRemove, true))
-	vr.RemoveAll(toRemove)
+	a.removeFailedServers(failed.getFailed(toRemove, true))
+	vr.removeAll(toRemove)
 
 	return nil
 }
 
-func (a *Autopilot) adjudicateRemoval(ids []raft.ServerID, vr *VoterRegistry) []raft.ServerID {
+func (a *Autopilot) adjudicateRemoval(ids []raft.ServerID, vr *voterRegistry) []raft.ServerID {
 	var result []raft.ServerID
-	initialPotentialVoters := vr.PotentialVoters()
+	initialPotentialVoters := vr.potentialVoters()
 	removedPotentialVoters := 0
 	maxRemoval := (initialPotentialVoters - 1) / 2
 	minQuorum := a.delegate.AutopilotConfig().MinQuorum
 
 	for _, id := range ids {
-		v, found := vr.Eligibility[id]
+		v, found := vr.eligibility[id]
 		if !found {
 
 		}
 
-		if v != nil && v.IsPotentialVoter() && initialPotentialVoters-removedPotentialVoters-1 < int(minQuorum) {
+		if v != nil && v.isPotentialVoter() && initialPotentialVoters-removedPotentialVoters-1 < int(minQuorum) {
 			a.logger.Debug("will not remove server node as it would leave less voters than the minimum number allowed", "id", id, "min", minQuorum)
-		} else if v.IsCurrentVoter() && maxRemoval < 1 {
+		} else if v.isCurrentVoter() && maxRemoval < 1 {
 			a.logger.Debug("will not remove server node as removal of a majority of voting servers is not safe", "id", id)
-		} else if v != nil && v.IsCurrentVoter() {
+		} else if v != nil && v.isCurrentVoter() {
 			maxRemoval--
 			// We need to track how many voters we have removed from the registry
 			// to ensure the total remaining potential voters is accurate
