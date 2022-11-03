@@ -895,7 +895,8 @@ func TestPruneDeadServers(t *testing.T) {
 		},
 		"stale-non-voters": {
 			// 2 working nodes and 2 stale servers - should only remove stale
-			// non-voter and refuse to remove anything else
+			// non-voter and refuse to remove anything else due to restrictions 
+			// preventing removal half or more of the servers in the cluster at once.
 			raftConfig: raft.Configuration{
 				Servers: []raft.Server{
 					{
