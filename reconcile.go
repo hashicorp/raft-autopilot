@@ -251,8 +251,10 @@ func (a *Autopilot) pruneDeadServers() error {
 
 	failed = a.promoter.FilterFailedServerRemovals(conf, state, failed)
 
-	// Remove servers in order of increasing precedence
-	// Update the voter registry after each batch is processed
+	// Remove servers in order of increasing precedence (and update the registry)
+	// Rules:
+	// 1. Deal with non-voters first as their removal shouldn't impact cluster stability.
+	// 2. Handle 'stale' before 'failed' in order to make progress towards the applications desired server set.
 
 	// remove stale non-voters
 	toRemove := a.adjudicateRemoval(failed.StaleNonVoters, vr)
