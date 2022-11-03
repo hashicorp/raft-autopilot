@@ -297,7 +297,7 @@ func (a *Autopilot) adjudicateRemoval(ids []raft.ServerID, vr *voterRegistry) []
 			a.logger.Debug("will not remove server node as it would leave less voters than the minimum number allowed", "id", id, "min", minQuorum)
 		} else if v.isCurrentVoter() && maxRemoval < 1 {
 			a.logger.Debug("will not remove server node as removal of a majority of voting servers is not safe", "id", id)
-		} else if v != nil && v.isCurrentVoter() {
+		} else if v != nil && v.isPotentialVoter() {
 			maxRemoval--
 			// We need to track how many voters we have removed from the registry
 			// to ensure the total remaining potential voters is accurate
