@@ -261,26 +261,26 @@ func (a *Autopilot) pruneDeadServers() error {
 	if err = a.removeStaleServers(toRemove); err != nil {
 		return err
 	}
-	vr.removeAll(toRemove)
+	vr.remove(toRemove...)
 
 	// Remove stale voters
 	toRemove = a.adjudicateRemoval(failed.StaleVoters, vr)
 	if err = a.removeStaleServers(toRemove); err != nil {
 		return err
 	}
-	vr.removeAll(toRemove)
+	vr.remove(toRemove...)
 
 	// remove failed non-voters
 	failedNonVoters := vr.filter(failed.FailedNonVoters)
 	toRemove = a.adjudicateRemoval(failedNonVoters, vr)
 	a.removeFailedServers(failed.getFailed(toRemove, false))
-	vr.removeAll(toRemove)
+	vr.remove(toRemove...)
 
 	// remove failed voters
 	failedVoters := vr.filter(failed.FailedVoters)
 	toRemove = a.adjudicateRemoval(failedVoters, vr)
 	a.removeFailedServers(failed.getFailed(toRemove, true))
-	vr.removeAll(toRemove)
+	vr.remove(toRemove...)
 
 	return nil
 }

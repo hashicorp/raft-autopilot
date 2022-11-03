@@ -383,16 +383,10 @@ func (vr *voterRegistry) filter(ids []*Server) []raft.ServerID {
 	return result
 }
 
-func (vr *voterRegistry) removeAll(ids []raft.ServerID) *voterRegistry {
+func (vr *voterRegistry) remove(ids ...raft.ServerID) *voterRegistry {
 	for _, id := range ids {
-		vr.remove(id)
+		delete(vr.eligibility, id)
 	}
-
-	return vr
-}
-
-func (vr *voterRegistry) remove(id raft.ServerID) *voterRegistry {
-	delete(vr.eligibility, id)
 
 	return vr
 }
