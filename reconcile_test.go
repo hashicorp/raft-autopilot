@@ -751,16 +751,16 @@ func TestPruneDeadServers(t *testing.T) {
 						ID:       "51fb4248-be6a-43e5-b47f-c089818e2012",
 						Address:  "198.18.0.2:8300",
 					},
-					// this is going to be our failed voter
+					// this is going to be our failed non-voter
 					{
-						Suffrage: raft.Voter,
+						Suffrage: raft.Nonvoter,
 						ID:       "a227f9a9-f55e-4321-b959-5afdcc63c6d3",
 						Address:  "198.18.0.3:8300",
 					},
 				},
 			},
 			expectedFailed: FailedServers{
-				FailedVoters: []*Server{
+				FailedNonVoters: []*Server{
 					{
 						ID:         "a227f9a9-f55e-4321-b959-5afdcc63c6d3",
 						Name:       "node3",
@@ -820,7 +820,7 @@ func TestPruneDeadServers(t *testing.T) {
 							Address:    "198.18.0.3:8300",
 							NodeStatus: NodeFailed,
 							NodeType:   NodeVoter,
-						}, State: RaftVoter,
+						}, State: RaftNonVoter,
 					},
 				},
 			},
