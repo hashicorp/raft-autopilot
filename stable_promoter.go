@@ -52,3 +52,7 @@ func (_ *StablePromoter) CalculatePromotionsAndDemotions(c *Config, s *State) Ra
 
 	return changes
 }
+
+func (_ *StablePromoter) IsPotentialVoter(nodeType NodeType) bool {
+	return nodeType == NodeVoter
+}

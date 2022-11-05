@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/raft"
 )
 
-// aliveServers will filter the input map of servers and output one with all of the
+// aliveServers will filter the input map of servers and output one with all the
 // servers in a Left state removed.
 func aliveServers(servers map[raft.ServerID]*Server) map[raft.ServerID]*Server {
 	serverMap := make(map[raft.ServerID]*Server)
@@ -74,10 +74,10 @@ func (a *Autopilot) gatherNextStateInputs(ctx context.Context) (*nextStateInputs
 	// This is really only important for when autopilot is first started. We will use the
 	// first state's time when determining if a server is stable. Under normal circumstances
 	// we need to just check that the current time - the servers StableSince time is greater
-	// than the configured stabilization time. However while autopilot has been running for
+	// than the configured stabilization time. However, while autopilot has been running for
 	// less time than the stabilization time we need to consider all servers as stable
-	// to prevent unnecessary leader elections. Therefore its important to track the first
-	// time a state was generated so we know if we have a state old enough where there is
+	// to prevent unnecessary leader elections. Therefore, it's important to track the first
+	// time a state was generated, so we know if we have a state old enough where there is
 	// any chance of seeing servers as stable based off that configured threshold.
 	var firstStateTime time.Time
 	currentState := a.GetState()
@@ -302,7 +302,7 @@ func (a *Autopilot) nextServers(inputs *nextStateInputs) map[raft.ServerID]*Serv
 func buildServerState(inputs *nextStateInputs, srv raft.Server) ServerState {
 	// Note that the ordering of operations in this method are very important.
 	// We are building up the ServerState from the least important sources
-	// and overriding them with more up to date values.
+	// and overriding them with more up-to-date values.
 
 	// build the basic state from the Raft server
 	state := ServerState{
@@ -337,8 +337,8 @@ func buildServerState(inputs *nextStateInputs, srv raft.Server) ServerState {
 		state.Health = existing.Health
 		previousHealthy = &state.Health.Healthy
 
-		// it is is important to note that the map values we retrieved this from are
-		// stored by value. Therefore we are modifying a copy of what is in the existing
+		// it is important to note that the map values we retrieved this from are
+		// stored by value. Therefore, we are modifying a copy of what is in the existing
 		// state and not the actual state itself. We want to ensure that the Address
 		// is what Raft will know about.
 		state.Server = existing.Server
@@ -350,7 +350,7 @@ func buildServerState(inputs *nextStateInputs, srv raft.Server) ServerState {
 	if known, found := inputs.KnownServers[srv.ID]; found {
 		// it is important to note that we are modifying a copy of a Server as the
 		// map we retrieved this from has a non-pointer type value. We definitely
-		// do not want to modify the current known servers but we do want to ensure
+		// do not want to modify the current known servers, but we do want to ensure
 		// that we do not overwrite the Address
 		state.Server = *known
 		state.Server.Address = srv.Address
@@ -367,7 +367,7 @@ func buildServerState(inputs *nextStateInputs, srv raft.Server) ServerState {
 		state.Server.IsLeader = true
 	}
 
-	// override the Stats if any where in the fetched results
+	// override the Stats if any were in the fetched results
 	if stats, found := inputs.FetchedStats[srv.ID]; found {
 		state.Stats = *stats
 	}
@@ -421,13 +421,13 @@ func SortServers(ids []raft.ServerID, s *State) {
 	})
 }
 
-// ServerLessThan will lookup both servers in the given State and return
+// ServerLessThan will look up both servers in the given State and return
 // true if the first id corresponds to a server that is logically less than
 // lower than, better than etc. the second server. The following criteria
 // are considered in order of most important to least important
 //
 // 1. A Leader server is always less than all others
-// 2. A voter is less than non voters
+// 2. A voter is less than non-voters
 // 3. Healthy servers are less than unhealthy servers
 // 4. Servers that have been stable longer are consider less than.
 func ServerLessThan(id1 raft.ServerID, id2 raft.ServerID, s *State) bool {
@@ -449,7 +449,7 @@ func ServerLessThan(id1 raft.ServerID, id2 raft.ServerID, s *State) bool {
 	}
 
 	// at this point we know that the raft state of both nodes is roughly
-	// equivalent so we want to now sort based on health
+	// equivalent, so we want to now sort based on health
 	if srvI.Health.Healthy == srvJ.Health.Healthy {
 		if srvI.Health.StableSince.Before(srvJ.Health.StableSince) {
 			return srvI.Health.Healthy

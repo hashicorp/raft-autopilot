@@ -90,6 +90,20 @@ func (_m *MockPromoter) GetStateExt(_a0 *Config, _a1 *State) interface{} {
 	return r0
 }
 
+// IsPotentialVoter provides a mock function with given fields: _a0
+func (_m *MockPromoter) IsPotentialVoter(_a0 NodeType) bool {
+	ret := _m.Called(_a0)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(NodeType) bool); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 type mockConstructorTestingTNewMockPromoter interface {
 	mock.TestingT
 	Cleanup(func())
