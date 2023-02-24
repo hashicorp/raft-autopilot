@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/raft"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -999,6 +1000,124 @@ func TestPruneDeadServers(t *testing.T) {
 					raft.ServerID("db877f23-3e0a-4107-8ed8-bd7c3d710945"),
 					uint64(0),
 					time.Duration(0),
+				).Return(&raftIndexFuture{}).Once()
+			},
+		},
+		"failed-voter": {
+			raftConfig: raft.Configuration{
+				Servers: []raft.Server{
+					{
+						Suffrage: raft.Voter,
+						ID:       "i-0bed0fe4dba2abdf2",
+						Address:  "172.31.40.26:8201",
+					},
+					{
+						Suffrage: raft.Voter,
+						ID:       "i-09c009cf528f0191f",
+						Address:  "172.31.4.39:8201",
+					},
+					// this is going to be our failed voter
+					{
+						Suffrage: raft.Voter,
+						ID:       "i-018896829478ee56b",
+						Address:  "172.31.6.155:8201",
+					},
+					{
+						Suffrage: raft.Voter,
+						ID:       "i-00f170341b9a7b822",
+						Address:  "172.31.30.146:8201",
+					},
+				},
+			},
+			knownServers: map[raft.ServerID]*Server{
+				"i-0bed0fe4dba2abdf2": {
+					ID:         "i-0bed0fe4dba2abdf2",
+					Name:       "i-0bed0fe4dba2abdf2",
+					Address:    "172.31.40.26:8201",
+					NodeStatus: NodeAlive,
+					NodeType:   NodeVoter,
+				},
+				"i-09c009cf528f0191f": {
+					ID:         "i-09c009cf528f0191f",
+					Name:       "i-09c009cf528f0191f",
+					Address:    "172.31.4.39:8201",
+					NodeStatus: NodeAlive,
+					NodeType:   NodeVoter,
+				},
+				"i-018896829478ee56b": {
+					ID:         "i-018896829478ee56b",
+					Name:       "i-018896829478ee56b",
+					Address:    "172.31.6.155:8201",
+					NodeStatus: NodeLeft,
+					NodeType:   NodeVoter,
+				},
+				"i-00f170341b9a7b822": {
+					ID:         "i-00f170341b9a7b822",
+					Name:       "i-00f170341b9a7b822",
+					Address:    "172.31.30.146:8201",
+					NodeStatus: NodeAlive,
+					NodeType:   NodeVoter,
+				},
+			},
+			state: State{
+				Servers: map[raft.ServerID]*ServerState{
+					"i-0bed0fe4dba2abdf2": {
+						Server: Server{
+							ID:         "i-0bed0fe4dba2abdf2",
+							Name:       "i-0bed0fe4dba2abdf2",
+							Address:    "172.31.40.26:8201",
+							NodeStatus: NodeAlive,
+							NodeType:   NodeVoter,
+						},
+						State: RaftLeader,
+					},
+					"i-09c009cf528f0191f": {
+						Server: Server{
+							ID:         "i-09c009cf528f0191f",
+							Name:       "i-09c009cf528f0191f",
+							Address:    "172.31.4.39:8201",
+							NodeStatus: NodeAlive,
+							NodeType:   NodeVoter,
+						},
+						State: RaftVoter,
+					},
+					"i-018896829478ee56b": {
+						Server: Server{
+							ID:         "i-018896829478ee56b",
+							Name:       "i-018896829478ee56b",
+							Address:    "172.31.6.155:8201",
+							NodeStatus: NodeLeft,
+							NodeType:   NodeVoter,
+						},
+						State: RaftVoter,
+					},
+					"i-00f170341b9a7b822": {
+						Server: Server{
+							ID:         "i-00f170341b9a7b822",
+							Name:       "i-00f170341b9a7b822",
+							Address:    "172.31.30.146:8201",
+							NodeStatus: NodeAlive,
+							NodeType:   NodeVoter,
+						},
+						State: RaftVoter,
+					},
+				},
+			},
+			expectedFailed: FailedServers{
+				FailedVoters: []*Server{
+					{
+						ID:         "i-018896829478ee56b",
+						Name:       "i-018896829478ee56b",
+						Address:    "172.31.6.155:8201",
+						NodeStatus: NodeLeft,
+						NodeType:   NodeVoter,
+					},
+				},
+			},
+			setupExpectations: func(mraft *MockRaft, mapp *MockApplicationIntegration) {
+				// failed voter
+				mapp.On("RemoveFailedServer",
+					mock.MatchedBy(func(s *Server) bool { return s.ID == "i-018896829478ee56b" }),
 				).Return(&raftIndexFuture{}).Once()
 			},
 		},
