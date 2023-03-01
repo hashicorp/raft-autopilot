@@ -259,7 +259,7 @@ func (a *Autopilot) pruneDeadServers() error {
 	}
 
 	failed = a.promoter.FilterFailedServerRemovals(conf, state, failed)
-	// TODO: PW: Ensure we've not got dupes at this point?
+	// De-dupe if required
 	failed.distinct()
 
 	// Remove servers in order of increasing precedence (and update the registry)
