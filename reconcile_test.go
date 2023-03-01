@@ -1070,6 +1070,10 @@ func TestPruneDeadServers(t *testing.T) {
 							NodeType:   NodeVoter,
 						},
 						State: RaftLeader,
+						Health: ServerHealth{
+							Healthy:     true,
+							StableSince: time.Now().Add(-2 * time.Minute),
+						},
 					},
 					"i-09c009cf528f0191f": {
 						Server: Server{
@@ -1080,6 +1084,10 @@ func TestPruneDeadServers(t *testing.T) {
 							NodeType:   NodeVoter,
 						},
 						State: RaftVoter,
+						Health: ServerHealth{
+							Healthy:     true,
+							StableSince: time.Now().Add(-2 * time.Minute),
+						},
 					},
 					"i-018896829478ee56b": {
 						Server: Server{
@@ -1090,6 +1098,10 @@ func TestPruneDeadServers(t *testing.T) {
 							NodeType:   NodeVoter,
 						},
 						State: RaftVoter,
+						Health: ServerHealth{
+							Healthy:     false,
+							StableSince: time.Now().Add(-5 * time.Minute),
+						},
 					},
 					"i-00f170341b9a7b822": {
 						Server: Server{
@@ -1100,6 +1112,10 @@ func TestPruneDeadServers(t *testing.T) {
 							NodeType:   NodeVoter,
 						},
 						State: RaftVoter,
+						Health: ServerHealth{
+							Healthy:     true,
+							StableSince: time.Now().Add(-2 * time.Minute),
+						},
 					},
 				},
 			},

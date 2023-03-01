@@ -2,8 +2,10 @@ package autopilot
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/raft"
 )
 
@@ -258,7 +260,9 @@ type FailedServers struct {
 	FailedVoters []*Server
 }
 
-func (f *FailedServers) getFailed(ids []raft.ServerID, isVoter bool) []*Server {
+// filterFailed examines the 'failed' servers (either non-voters or voters) which are stored within a FailedServers struct.
+// It returns existing Servers which match the supplied raft.ServerIDs.
+func (f *FailedServers) filterFailed(ids []raft.ServerID, isVoter bool) []*Server {
 	var servers []*Server
 	var result []*Server
 
@@ -277,6 +281,98 @@ func (f *FailedServers) getFailed(ids []raft.ServerID, isVoter bool) []*Server {
 	}
 
 	return result
+}
+
+func (f *FailedServers) exclusive() error {
+	keys := map[raft.ServerID]string{}
+	var result error
+
+	keys, err := exclusiveFailed(f.FailedVoters, keys, "failed-voters")
+	if err != nil {
+		result = multierror.Append(result, err)
+	}
+
+	keys, err = exclusiveFailed(f.FailedNonVoters, keys, "failed-non-voters")
+	if err != nil {
+		result = multierror.Append(result, err)
+	}
+
+	keys, err = exclusiveStale(f.StaleVoters, keys, "stale-voters")
+	if err != nil {
+		result = multierror.Append(result, err)
+	}
+
+	keys, err = exclusiveStale(f.StaleNonVoters, keys, "stale-non-voters")
+	if err != nil {
+		result = multierror.Append(result, err)
+	}
+
+	return result
+}
+
+func exclusiveFailed(servers []*Server, keys map[raft.ServerID]string, label string) (map[raft.ServerID]string, error) {
+	var result error
+
+	for _, srv := range servers {
+		existing, found := keys[srv.ID]
+		if found {
+			result = multierror.Append(result, fmt.Errorf("parsing %q, duplicate ID: %v found in %q", label, srv.ID, existing))
+		} else {
+			keys[srv.ID] = label
+		}
+	}
+
+	return keys, result
+}
+
+func exclusiveStale(servers []raft.ServerID, keys map[raft.ServerID]string, label string) (map[raft.ServerID]string, error) {
+	var result error
+
+	for _, id := range servers {
+		existing, found := keys[id]
+		if found {
+			result = multierror.Append(result, fmt.Errorf("parsing %q, duplicate ID: %v found in %q", label, id, existing))
+		} else {
+			keys[id] = label
+		}
+	}
+
+	return keys, result
+}
+
+func (f *FailedServers) distinct() {
+	f.FailedVoters = distinctFailed(f.FailedVoters)
+	f.FailedNonVoters = distinctFailed(f.FailedNonVoters)
+	f.StaleVoters = distinctStale(f.StaleVoters)
+	f.StaleNonVoters = distinctStale(f.StaleNonVoters)
+}
+
+func distinctStale(servers []raft.ServerID) []raft.ServerID {
+	keys := make(map[raft.ServerID]struct{})
+	var stale []raft.ServerID
+
+	for _, entry := range servers {
+		if _, value := keys[entry]; !value {
+			keys[entry] = struct{}{}
+			stale = append(stale, entry)
+		}
+	}
+
+	return stale
+}
+
+func distinctFailed(servers []*Server) []*Server {
+	keys := make(map[raft.ServerID]struct{})
+	var failed []*Server
+
+	for _, entry := range servers {
+		if _, value := keys[entry.ID]; !value {
+			keys[entry.ID] = struct{}{}
+			failed = append(failed, entry)
+		}
+	}
+
+	return failed
 }
 
 // Promoter is an interface to provide promotion/demotion algorithms to the core autopilot type.
