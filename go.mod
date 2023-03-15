@@ -8,7 +8,7 @@ require (
 	github.com/hashicorp/raft v1.3.11
 	github.com/stretchr/testify v1.8.2
 	go.uber.org/goleak v1.2.1
-	golang.org/x/sync v0.0.0-20190423024810-112230192c58
+	golang.org/x/sync v0.1.0
 )
 
 require (
@@ -24,7 +24,6 @@ require (
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
-	golang.org/x/lint v0.0.0-20190930215403-16217165b5de // indirect
 	golang.org/x/sys v0.0.0-20220503163025-988cb79eb6c6 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
