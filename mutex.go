@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 /*
 This code was taken from the same implementation in a branch from Consul and then
 had the package updated and the mutex type unexported.
