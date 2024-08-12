@@ -3,7 +3,7 @@ module github.com/hashicorp/raft-autopilot
 go 1.20
 
 require (
-	github.com/hashicorp/go-hclog v1.6.2
+	github.com/hashicorp/go-hclog v1.6.3
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/raft v1.6.0
 	github.com/stretchr/testify v1.9.0
