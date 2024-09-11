@@ -32,6 +32,13 @@ func (a *Autopilot) reconcile() error {
 	// have the promoter calculate the required Raft changeset.
 	changes := a.promoter.CalculatePromotionsAndDemotions(conf, state)
 
+	// apply the demotions to the failed servers first, if we did apply any then
+	// stop here as we do not want to apply the promotions at the same time as a
+	// means of preventing cluster instability
+	if done, err := a.applyDemotions(state, changes, true); done {
+		return err
+	}
+
 	// apply the promotions, if we did apply any then stop here
 	// as we do not want to apply the demotions at the same time
 	// as a means of preventing cluster instability.
@@ -39,11 +46,11 @@ func (a *Autopilot) reconcile() error {
 		return err
 	}
 
-	// apply the demotions, if we did apply any then stop here
+	// apply the demotions to healthy servers, if we did apply any then stop here
 	// as we do not want to transition leadership and do demotions
 	// at the same time. This is a preventative measure to maintain
 	// cluster stability.
-	if done, err := a.applyDemotions(state, changes); done {
+	if done, err := a.applyDemotions(state, changes, false); done {
 		return err
 	}
 
@@ -112,14 +119,22 @@ func (a *Autopilot) applyPromotions(state *State, changes RaftChanges) (bool, er
 	return promoted, nil
 }
 
-// applyDemotions will apply all the demotions in the RaftChanges parameter.
+// applyDemotions will apply all the demotions in the RaftChanges parameter to
+// either to healthy or unhealthy servers, based on the value of the
+// demoteFailed parameter.
+//
+// Since applyDemotions is called twice, once for failed servers and once for
+// healthy servers, demoteFailed is used to differentiate between the two.
 //
 // IDs in the change set will be ignored if:
-// * The server isn't tracked in the provided state
-// * The server does not have voting rights
+//   - The server isn't tracked in the provided state
+//   - The server does not have voting rights
+//   - The server's health status matches the demoteFailed parameter, i.e. when
+//     we are demoting failed servers, healthy servers will be ignored and vice
+//     versa.
 //
 // If any servers were demoted this function returns true for the bool value.
-func (a *Autopilot) applyDemotions(state *State, changes RaftChanges) (bool, error) {
+func (a *Autopilot) applyDemotions(state *State, changes RaftChanges, demoteFailed bool) (bool, error) {
 	demoted := false
 	for _, change := range changes.Demotions {
 		srv, found := state.Servers[change]
@@ -137,6 +152,11 @@ func (a *Autopilot) applyDemotions(state *State, changes RaftChanges) (bool, err
 			// be voters and non-voters without caring about which ones currently
 			// already are in that state.
 			a.logger.Debug("Ignoring demotion of server that is already a non-voter", "id", change)
+			continue
+		}
+
+		if srv.Health.Healthy == demoteFailed {
+			a.logger.Debug("Ignoring demotion of server due to health status", "id", change, "healthy", srv.Health.Healthy)
 			continue
 		}
 

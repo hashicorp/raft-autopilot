@@ -20,7 +20,7 @@ func TestReconcile(t *testing.T) {
 	}
 
 	cases := map[string]testCase{
-		"promote-one-and-filter-others-and-demotions": {
+		"ignore-failed-nonvoter-promote-one-and-filter-others-and-demotions": {
 			state: State{
 				Leader: "96be11f3-c9b9-45ab-a719-dc9472ada6fe",
 				Servers: map[raft.ServerID]*ServerState{
@@ -82,7 +82,7 @@ func TestReconcile(t *testing.T) {
 							RaftVersion: 3,
 						},
 						State:  RaftVoter,
-						Health: ServerHealth{Healthy: false},
+						Health: ServerHealth{Healthy: true},
 					},
 				},
 			},
@@ -98,7 +98,8 @@ func TestReconcile(t *testing.T) {
 					"b8508007-68d5-42c9-92a6-28686676867e",
 				},
 				Demotions: []raft.ServerID{
-					// shouldn't actually be done since we are promoting one
+					// shouldn't actually be done since it is healthy, and we
+					// are promoting another server
 					"bcd603a7-18e2-48c6-ac60-167e1556f4b0",
 				},
 			},
@@ -186,10 +187,10 @@ func TestReconcile(t *testing.T) {
 				Demotions: []raft.ServerID{
 					// already a non-voter so nothing should be done
 					"0a79bbf7-7113-4947-a257-6179326f188c",
-					// should adtually get demoted
+					// should actually get demoted
 					"4b92b892-ee0d-4644-84fb-3117448a0401",
 				},
-				// no leader ship transfer should be done because we did demotions
+				// no leadership transfer should be done because we did demotions
 				Leader: "c86da54b-19e1-4ead-a3b7-17807b7712a6",
 			},
 			setupExpectations: func(m *MockRaft) {
@@ -258,7 +259,7 @@ func TestReconcile(t *testing.T) {
 					// already a non-voter so nothing should be done
 					"0a79bbf7-7113-4947-a257-6179326f188c",
 				},
-				// no leader ship transfer should be done because we did demotions
+				// no leadership transfer should be done because we did demotions
 				Leader: "96be11f3-c9b9-45ab-a719-dc9472ada6fe",
 			},
 		},
@@ -328,6 +329,102 @@ func TestReconcile(t *testing.T) {
 				m.On("LeadershipTransferToServer",
 					raft.ServerID("1f07052e-53c7-4f99-9cb6-6bb5b39ce8a8"),
 					raft.ServerAddress("198.18.0.2:8300")).Return(&raftIndexFuture{}).Once()
+			},
+		},
+		"demote-unhealthy-voter-filter-others": {
+			state: State{
+				Leader: "96be11f3-c9b9-45ab-a719-dc9472ada6fe",
+				Servers: map[raft.ServerID]*ServerState{
+					"96be11f3-c9b9-45ab-a719-dc9472ada6fe": {
+						Server: Server{
+							ID:          "96be11f3-c9b9-45ab-a719-dc9472ada6fe",
+							Name:        "node1",
+							Address:     "198.18.0.1:8300",
+							NodeStatus:  NodeAlive,
+							Version:     "1.9.0",
+							RaftVersion: 3,
+						},
+						State:  RaftLeader,
+						Health: ServerHealth{Healthy: true},
+					},
+					"4b92b892-ee0d-4644-84fb-3117448a0401": {
+						Server: Server{
+							ID:          "4b92b892-ee0d-4644-84fb-3117448a0401",
+							Name:        "node2",
+							Address:     "198.18.0.2:8300",
+							NodeStatus:  NodeAlive,
+							Version:     "1.9.0",
+							RaftVersion: 3,
+						},
+						State:  RaftVoter,
+						Health: ServerHealth{Healthy: true},
+					},
+					"0a79bbf7-7113-4947-a257-6179326f188c": {
+						Server: Server{
+							ID:          "0a79bbf7-7113-4947-a257-6179326f188c",
+							Name:        "node3",
+							Address:     "198.18.0.3:8300",
+							NodeStatus:  NodeAlive,
+							Version:     "1.9.0",
+							RaftVersion: 3,
+						},
+						State:  RaftNonVoter,
+						Health: ServerHealth{Healthy: true},
+					},
+					"b8508007-68d5-42c9-92a6-28686676867e": {
+						Server: Server{
+							ID:          "b8508007-68d5-42c9-92a6-28686676867e",
+							Name:        "node4",
+							Address:     "198.18.0.4:8300",
+							NodeStatus:  NodeAlive,
+							Version:     "1.9.0",
+							RaftVersion: 3,
+						},
+						State:  RaftVoter,
+						Health: ServerHealth{Healthy: false},
+					},
+					"bcd603a7-18e2-48c6-ac60-167e1556f4b0": {
+						Server: Server{
+							ID:          "bcd603a7-18e2-48c6-ac60-167e1556f4b0",
+							Name:        "node5",
+							Address:     "198.18.0.5:8300",
+							NodeStatus:  NodeAlive,
+							Version:     "1.9.0",
+							RaftVersion: 3,
+						},
+						State:  RaftVoter,
+						Health: ServerHealth{Healthy: false},
+					},
+				},
+			},
+			changes: RaftChanges{
+				Promotions: []raft.ServerID{
+					// promotions should not happen unless there are no
+					// unhealthy voters to demote
+					"96be11f3-c9b9-45ab-a719-dc9472ada6fe",
+					"4b92b892-ee0d-4644-84fb-3117448a0401",
+					"0a79bbf7-7113-4947-a257-6179326f188c",
+				},
+				Demotions: []raft.ServerID{
+					// healthy voter should not be demoted unless there are no
+					// unhealthy voters to demote first and no promotions to be
+					// made
+					"b8508007-68d5-42c9-92a6-28686676867e",
+					// unhealthy voter should be demoted
+					"bcd603a7-18e2-48c6-ac60-167e1556f4b0",
+				},
+			},
+			setupExpectations: func(m *MockRaft) {
+				m.On("DemoteVoter",
+					raft.ServerID("b8508007-68d5-42c9-92a6-28686676867e"),
+					uint64(0),
+					time.Duration(0),
+				).Return(&raftIndexFuture{}).Once()
+				m.On("DemoteVoter",
+					raft.ServerID("bcd603a7-18e2-48c6-ac60-167e1556f4b0"),
+					uint64(0),
+					time.Duration(0),
+				).Return(&raftIndexFuture{}).Once()
 			},
 		},
 	}
