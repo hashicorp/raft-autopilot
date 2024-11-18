@@ -32,11 +32,16 @@ func (a *Autopilot) reconcile() error {
 	// have the promoter calculate the required Raft changeset.
 	changes := a.promoter.CalculatePromotionsAndDemotions(conf, state)
 
-	// apply the demotions to the failed servers first, if we did apply any then
-	// stop here as we do not want to apply the promotions at the same time as a
-	// means of preventing cluster instability
-	if done, err := a.applyDemotions(state, changes, true); done {
-		return err
+	// Apply the demotions to the failed servers first, but only once per a
+	// reconciliation round and if the number of voters is odd. In that case we
+	// don't want to start with the promotions, since that temporalily inflates
+	// quorum, which could lead to cluster failure. If we did apply any, then stop
+	// here as we do not want to apply the promotions at the same time as a means of
+	// preventing cluster instability.
+	if len(state.Voters)%2 != 0 {
+		if done, err := a.applyDemotions(state, changes, true); done {
+			return err
+		}
 	}
 
 	// apply the promotions, if we did apply any then stop here
@@ -119,12 +124,11 @@ func (a *Autopilot) applyPromotions(state *State, changes RaftChanges) (bool, er
 	return promoted, nil
 }
 
-// applyDemotions will apply all the demotions in the RaftChanges parameter to
-// either to healthy or unhealthy servers, based on the value of the
-// demoteFailed parameter.
-//
-// Since applyDemotions is called twice, once for failed servers and once for
-// healthy servers, demoteFailed is used to differentiate between the two.
+// applyDemotions will apply the demotions in the RaftChanges parameter either to healthy or
+// unhealthy servers, based on the value of the demoteFailed parameter:
+//   - If demoteFailed is true, then the demotions will be applied to unhealthy servers and the function
+//     will return after a single demotion.
+//   - If demoteFailed is false, then the all of the demotions will be applied to healthy servers.
 //
 // IDs in the change set will be ignored if:
 //   - The server isn't tracked in the provided state
@@ -156,7 +160,13 @@ func (a *Autopilot) applyDemotions(state *State, changes RaftChanges, demoteFail
 		}
 
 		if srv.Health.Healthy == demoteFailed {
-			a.logger.Debug("Ignoring demotion of server due to health status", "id", change, "healthy", srv.Health.Healthy)
+			var msg string
+			if srv.Health.Healthy {
+				msg = "Ignoring demotion of healthy server during failed server demotion process"
+			} else {
+				msg = "Ignoring demotion of failed server during healthy server demotion process"
+			}
+			a.logger.Debug(msg, "id", change)
 			continue
 		}
 
@@ -167,6 +177,11 @@ func (a *Autopilot) applyDemotions(state *State, changes RaftChanges, demoteFail
 		}
 
 		demoted = true
+
+		// We only want to demote one failed server at a time to prevent violating the minimum quorum setting.
+		if demoteFailed {
+			return demoted, nil
+		}
 	}
 
 	// similarly to applyPromotions here we want to stop the process and prevent leadership
