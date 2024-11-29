@@ -32,14 +32,12 @@ func (a *Autopilot) reconcile() error {
 	// have the promoter calculate the required Raft changeset.
 	changes := a.promoter.CalculatePromotionsAndDemotions(conf, state)
 
-	// Apply the demotions to the failed servers first, but only once per a
+	// Apply the demotion to a failed server first, but only a single one per a
 	// reconciliation round and if the number of voters is odd. In that case we
 	// don't want to start with the promotions, since that temporalily inflates
-	// quorum, which could lead to cluster failure. If we did apply any, then stop
-	// here as we do not want to apply the promotions at the same time as a means of
-	// preventing cluster instability.
+	// quorum, which could lead to cluster failure if more voters fail.
 	if len(state.Voters)%2 != 0 {
-		if done, err := a.applyDemotions(state, changes, true); done {
+		if _, err := a.applyDemotions(state, changes, true); err != nil {
 			return err
 		}
 	}
@@ -126,8 +124,8 @@ func (a *Autopilot) applyPromotions(state *State, changes RaftChanges) (bool, er
 
 // applyDemotions will apply the demotions in the RaftChanges parameter either to healthy or
 // unhealthy servers, based on the value of the demoteFailed parameter:
-//   - If demoteFailed is true, then the demotions will be applied to unhealthy servers and the function
-//     will return after a single demotion.
+//   - If demoteFailed is true, then a single demotion will be applied to an unhealthy server and the function
+//     will return. We limit this to a single demotion to prevent violating the minimum quorum setting.
 //   - If demoteFailed is false, then the all of the demotions will be applied to healthy servers.
 //
 // IDs in the change set will be ignored if:

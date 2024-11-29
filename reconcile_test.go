@@ -156,7 +156,7 @@ func TestReconcile(t *testing.T) {
 					raft.ServerAddress("198.18.0.2:8300")).Return(&raftIndexFuture{}).Once()
 			},
 		},
-		"demote-single-unhealthy-voter-filter-others": {
+		"demote-single-unhealthy-voter-promote-a-non-voter": {
 			state: State{
 				Leader: "11111111-1111-1111-1111-111111111111",
 				Servers: map[raft.ServerID]*ServerState{
@@ -164,8 +164,7 @@ func TestReconcile(t *testing.T) {
 					"22222222-2222-2222-2222-222222222222": makeServerState("2", RaftVoter, false),
 					"33333333-3333-3333-3333-333333333333": makeServerState("3", RaftVoter, false),
 					"44444444-4444-4444-4444-444444444444": makeServerState("4", RaftVoter, true),
-					"55555555-5555-5555-5555-555555555555": makeServerState("5", RaftVoter, true),
-					"66666666-6666-6666-6666-666666666666": makeServerState("6", RaftNonVoter, true),
+					"55555555-5555-5555-5555-555555555555": makeServerState("5", RaftNonVoter, true),
 				},
 				Voters: []raft.ServerID{
 					"11111111-1111-1111-1111-111111111111",
@@ -177,8 +176,8 @@ func TestReconcile(t *testing.T) {
 			},
 			changes: RaftChanges{
 				Promotions: []raft.ServerID{
-					// promotions should not happen unless there are no unhealthy voters to demote
-					"66666666-6666-6666-6666-666666666666",
+					// promotion should happen after one failed voter is demoted
+					"55555555-5555-5555-5555-555555555555",
 				},
 				Demotions: []raft.ServerID{
 					// healthy voter should not be demoted unless there are no unhealthy voters to
@@ -193,6 +192,12 @@ func TestReconcile(t *testing.T) {
 			setupExpectations: func(m *MockRaft) {
 				m.On("DemoteVoter",
 					raft.ServerID("22222222-2222-2222-2222-222222222222"),
+					uint64(0),
+					time.Duration(0),
+				).Return(&raftIndexFuture{}).Once()
+				m.On("AddVoter",
+					raft.ServerID("55555555-5555-5555-5555-555555555555"),
+					raft.ServerAddress("198.18.0.5:8300"),
 					uint64(0),
 					time.Duration(0),
 				).Return(&raftIndexFuture{}).Once()
@@ -223,8 +228,10 @@ func TestReconcile(t *testing.T) {
 					"66666666-6666-6666-6666-666666666666",
 				},
 				Demotions: []raft.ServerID{
-					// no demotions should happen in this reconciliation
-					// since we are starting with an even number of voters
+					// Both servers are unhealthy, but no demotions should happen in this
+					// reconciliation since we are starting with an even number of voters. We're
+					// still passing the demotions to the reconcile function to ensure that they are
+					// filtered out.
 					"33333333-3333-3333-3333-333333333333",
 					"44444444-4444-4444-4444-444444444444",
 				},
