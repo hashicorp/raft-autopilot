@@ -122,8 +122,8 @@ func (a *Autopilot) applyPromotions(state *State, changes RaftChanges) (bool, er
 	return promoted, nil
 }
 
-// applyDemotions will apply the demotions in the RaftChanges parameter either to healthy
-// or unhealthy servers, based on the value of the demoteSingleFailedServer parameter:
+// applyDemotions will apply the demotions in the RaftChanges parameter either to all or
+// just unhealthy servers, based on the value of the demoteSingleFailedServer parameter:
 //   - If demoteSingleFailedServer is true, then a single demotion will be applied
 //     to an unhealthy server and the function will return. We limit this to a
 //     single demotion to prevent violating the minimum quorum setting.
