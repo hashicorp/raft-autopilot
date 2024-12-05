@@ -49,7 +49,7 @@ func (a *Autopilot) reconcile() error {
 		return err
 	}
 
-	// apply the demotions to healthy servers, if we did apply any then stop here
+	// apply the demotions, if we did apply any then stop here
 	// as we do not want to transition leadership and do demotions
 	// at the same time. This is a preventative measure to maintain
 	// cluster stability.
