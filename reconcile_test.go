@@ -251,6 +251,49 @@ func TestReconcile(t *testing.T) {
 				).Return(&raftIndexFuture{}).Once()
 			},
 		},
+		"demote-any-with-even-voters-and-no-promotions": {
+			state: State{
+				Leader: "11111111-1111-1111-1111-111111111111",
+				Servers: map[raft.ServerID]*ServerState{
+					"11111111-1111-1111-1111-111111111111": makeServerState("1", RaftLeader, true),
+					"22222222-2222-2222-2222-222222222222": makeServerState("2", RaftVoter, true),
+					"33333333-3333-3333-3333-333333333333": makeServerState("3", RaftVoter, false),
+					"44444444-4444-4444-4444-444444444444": makeServerState("4", RaftVoter, false),
+					"55555555-5555-5555-5555-555555555555": makeServerState("5", RaftVoter, true),
+					"66666666-6666-6666-6666-666666666666": makeServerState("6", RaftVoter, true),
+				},
+				Voters: []raft.ServerID{
+					"11111111-1111-1111-1111-111111111111",
+					"22222222-2222-2222-2222-222222222222",
+					"33333333-3333-3333-3333-333333333333",
+					"44444444-4444-4444-4444-444444444444",
+				},
+			},
+			changes: RaftChanges{
+				Demotions: []raft.ServerID{
+					"33333333-3333-3333-3333-333333333333",
+					"44444444-4444-4444-4444-444444444444",
+					"55555555-5555-5555-5555-555555555555",
+				},
+			},
+			setupExpectations: func(m *MockRaft) {
+				m.On("DemoteVoter",
+					raft.ServerID("33333333-3333-3333-3333-333333333333"),
+					uint64(0),
+					time.Duration(0),
+				).Return(&raftIndexFuture{}).Once()
+				m.On("DemoteVoter",
+					raft.ServerID("44444444-4444-4444-4444-444444444444"),
+					uint64(0),
+					time.Duration(0),
+				).Return(&raftIndexFuture{}).Once()
+				m.On("DemoteVoter",
+					raft.ServerID("55555555-5555-5555-5555-555555555555"),
+					uint64(0),
+					time.Duration(0),
+				).Return(&raftIndexFuture{}).Once()
+			},
+		},
 	}
 
 	for name, tcase := range cases {
