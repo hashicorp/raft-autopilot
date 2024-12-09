@@ -14,6 +14,33 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type serverHealthState bool
+
+const (
+	unhealthy serverHealthState = false
+	healthy   serverHealthState = true
+)
+
+// makeServerState creates a test ServerState and returns a pointer to it.
+// The node index argument is a string that should be a single digit,
+// used to generate the server ID, name, and address.
+func makeServerState(nodeIndex string, nodeState RaftState, healthy serverHealthState) *ServerState {
+	return &ServerState{
+		Server: Server{
+			ID:          raft.ServerID(fmt.Sprintf("%[1]s%[1]s-%[1]s-%[1]s-%[1]s-%[1]s%[1]s%[1]s", strings.Repeat(nodeIndex, 4))),
+			Name:        fmt.Sprintf("node%s", nodeIndex),
+			Address:     raft.ServerAddress(fmt.Sprintf("198.18.0.%s:8300", nodeIndex)),
+			NodeStatus:  NodeAlive,
+			Version:     "1.9.0",
+			RaftVersion: 3,
+		},
+		State: nodeState,
+		Health: ServerHealth{
+			Healthy: bool(healthy),
+		},
+	}
+}
+
 func TestReconcile(t *testing.T) {
 	type testCase struct {
 		changes           RaftChanges
@@ -26,11 +53,11 @@ func TestReconcile(t *testing.T) {
 			state: State{
 				Leader: "11111111-1111-1111-1111-111111111111",
 				Servers: map[raft.ServerID]*ServerState{
-					"11111111-1111-1111-1111-111111111111": makeServerState("1", RaftLeader, true),
-					"22222222-2222-2222-2222-222222222222": makeServerState("2", RaftVoter, true),
-					"33333333-3333-3333-3333-333333333333": makeServerState("3", RaftNonVoter, true),
-					"44444444-4444-4444-4444-444444444444": makeServerState("4", RaftNonVoter, false),
-					"55555555-5555-5555-5555-555555555555": makeServerState("5", RaftVoter, true),
+					"11111111-1111-1111-1111-111111111111": makeServerState("1", RaftLeader, healthy),
+					"22222222-2222-2222-2222-222222222222": makeServerState("2", RaftVoter, healthy),
+					"33333333-3333-3333-3333-333333333333": makeServerState("3", RaftNonVoter, healthy),
+					"44444444-4444-4444-4444-444444444444": makeServerState("4", RaftNonVoter, unhealthy),
+					"55555555-5555-5555-5555-555555555555": makeServerState("5", RaftVoter, healthy),
 				},
 				Voters: []raft.ServerID{
 					"11111111-1111-1111-1111-111111111111",
@@ -68,11 +95,11 @@ func TestReconcile(t *testing.T) {
 			state: State{
 				Leader: "11111111-1111-1111-1111-111111111111",
 				Servers: map[raft.ServerID]*ServerState{
-					"11111111-1111-1111-1111-111111111111": makeServerState("1", RaftLeader, true),
-					"22222222-2222-2222-2222-222222222222": makeServerState("2", RaftVoter, true),
-					"33333333-3333-3333-3333-333333333333": makeServerState("3", RaftVoter, true),
-					"44444444-4444-4444-4444-444444444444": makeServerState("4", RaftVoter, true),
-					"55555555-5555-5555-5555-555555555555": makeServerState("5", RaftNonVoter, true),
+					"11111111-1111-1111-1111-111111111111": makeServerState("1", RaftLeader, healthy),
+					"22222222-2222-2222-2222-222222222222": makeServerState("2", RaftVoter, healthy),
+					"33333333-3333-3333-3333-333333333333": makeServerState("3", RaftVoter, healthy),
+					"44444444-4444-4444-4444-444444444444": makeServerState("4", RaftVoter, healthy),
+					"55555555-5555-5555-5555-555555555555": makeServerState("5", RaftNonVoter, healthy),
 				},
 				Voters: []raft.ServerID{
 					"11111111-1111-1111-1111-111111111111",
@@ -107,10 +134,10 @@ func TestReconcile(t *testing.T) {
 			state: State{
 				Leader: "11111111-1111-1111-1111-111111111111",
 				Servers: map[raft.ServerID]*ServerState{
-					"11111111-1111-1111-1111-111111111111": makeServerState("1", RaftLeader, true),
-					"22222222-2222-2222-2222-222222222222": makeServerState("2", RaftVoter, true),
-					"33333333-3333-3333-3333-333333333333": makeServerState("3", RaftVoter, true),
-					"55555555-5555-5555-5555-555555555555": makeServerState("5", RaftNonVoter, true),
+					"11111111-1111-1111-1111-111111111111": makeServerState("1", RaftLeader, healthy),
+					"22222222-2222-2222-2222-222222222222": makeServerState("2", RaftVoter, healthy),
+					"33333333-3333-3333-3333-333333333333": makeServerState("3", RaftVoter, healthy),
+					"55555555-5555-5555-5555-555555555555": makeServerState("5", RaftNonVoter, healthy),
 				},
 				Voters: []raft.ServerID{
 					"11111111-1111-1111-1111-111111111111",
@@ -131,10 +158,10 @@ func TestReconcile(t *testing.T) {
 			state: State{
 				Leader: "11111111-1111-1111-1111-111111111111",
 				Servers: map[raft.ServerID]*ServerState{
-					"11111111-1111-1111-1111-111111111111": makeServerState("1", RaftLeader, true),
-					"22222222-2222-2222-2222-222222222222": makeServerState("2", RaftVoter, true),
-					"33333333-3333-3333-3333-333333333333": makeServerState("3", RaftVoter, true),
-					"55555555-5555-5555-5555-555555555555": makeServerState("5", RaftNonVoter, true),
+					"11111111-1111-1111-1111-111111111111": makeServerState("1", RaftLeader, healthy),
+					"22222222-2222-2222-2222-222222222222": makeServerState("2", RaftVoter, healthy),
+					"33333333-3333-3333-3333-333333333333": makeServerState("3", RaftVoter, healthy),
+					"55555555-5555-5555-5555-555555555555": makeServerState("5", RaftNonVoter, healthy),
 				},
 				Voters: []raft.ServerID{
 					"11111111-1111-1111-1111-111111111111",
@@ -160,11 +187,11 @@ func TestReconcile(t *testing.T) {
 			state: State{
 				Leader: "11111111-1111-1111-1111-111111111111",
 				Servers: map[raft.ServerID]*ServerState{
-					"11111111-1111-1111-1111-111111111111": makeServerState("1", RaftLeader, true),
-					"22222222-2222-2222-2222-222222222222": makeServerState("2", RaftVoter, false),
-					"33333333-3333-3333-3333-333333333333": makeServerState("3", RaftVoter, false),
-					"44444444-4444-4444-4444-444444444444": makeServerState("4", RaftVoter, true),
-					"55555555-5555-5555-5555-555555555555": makeServerState("5", RaftNonVoter, true),
+					"11111111-1111-1111-1111-111111111111": makeServerState("1", RaftLeader, healthy),
+					"22222222-2222-2222-2222-222222222222": makeServerState("2", RaftVoter, unhealthy),
+					"33333333-3333-3333-3333-333333333333": makeServerState("3", RaftVoter, unhealthy),
+					"44444444-4444-4444-4444-444444444444": makeServerState("4", RaftVoter, healthy),
+					"55555555-5555-5555-5555-555555555555": makeServerState("5", RaftNonVoter, healthy),
 				},
 				Voters: []raft.ServerID{
 					"11111111-1111-1111-1111-111111111111",
@@ -207,12 +234,12 @@ func TestReconcile(t *testing.T) {
 			state: State{
 				Leader: "11111111-1111-1111-1111-111111111111",
 				Servers: map[raft.ServerID]*ServerState{
-					"11111111-1111-1111-1111-111111111111": makeServerState("1", RaftLeader, true),
-					"22222222-2222-2222-2222-222222222222": makeServerState("2", RaftVoter, true),
-					"33333333-3333-3333-3333-333333333333": makeServerState("3", RaftVoter, false),
-					"44444444-4444-4444-4444-444444444444": makeServerState("4", RaftVoter, false),
-					"55555555-5555-5555-5555-555555555555": makeServerState("5", RaftNonVoter, true),
-					"66666666-6666-6666-6666-666666666666": makeServerState("6", RaftNonVoter, true),
+					"11111111-1111-1111-1111-111111111111": makeServerState("1", RaftLeader, healthy),
+					"22222222-2222-2222-2222-222222222222": makeServerState("2", RaftVoter, healthy),
+					"33333333-3333-3333-3333-333333333333": makeServerState("3", RaftVoter, unhealthy),
+					"44444444-4444-4444-4444-444444444444": makeServerState("4", RaftVoter, unhealthy),
+					"55555555-5555-5555-5555-555555555555": makeServerState("5", RaftNonVoter, healthy),
+					"66666666-6666-6666-6666-666666666666": makeServerState("6", RaftNonVoter, healthy),
 				},
 				Voters: []raft.ServerID{
 					"11111111-1111-1111-1111-111111111111",
@@ -255,12 +282,12 @@ func TestReconcile(t *testing.T) {
 			state: State{
 				Leader: "11111111-1111-1111-1111-111111111111",
 				Servers: map[raft.ServerID]*ServerState{
-					"11111111-1111-1111-1111-111111111111": makeServerState("1", RaftLeader, true),
-					"22222222-2222-2222-2222-222222222222": makeServerState("2", RaftVoter, true),
-					"33333333-3333-3333-3333-333333333333": makeServerState("3", RaftVoter, false),
-					"44444444-4444-4444-4444-444444444444": makeServerState("4", RaftVoter, false),
-					"55555555-5555-5555-5555-555555555555": makeServerState("5", RaftVoter, true),
-					"66666666-6666-6666-6666-666666666666": makeServerState("6", RaftVoter, true),
+					"11111111-1111-1111-1111-111111111111": makeServerState("1", RaftLeader, healthy),
+					"22222222-2222-2222-2222-222222222222": makeServerState("2", RaftVoter, healthy),
+					"33333333-3333-3333-3333-333333333333": makeServerState("3", RaftVoter, unhealthy),
+					"44444444-4444-4444-4444-444444444444": makeServerState("4", RaftVoter, unhealthy),
+					"55555555-5555-5555-5555-555555555555": makeServerState("5", RaftVoter, healthy),
+					"66666666-6666-6666-6666-666666666666": makeServerState("6", RaftVoter, healthy),
 				},
 				Voters: []raft.ServerID{
 					"11111111-1111-1111-1111-111111111111",
@@ -322,26 +349,6 @@ func TestReconcile(t *testing.T) {
 			err := a.reconcile()
 			require.NoError(t, err)
 		})
-	}
-}
-
-// makeServerState creates a ServerState and returns a pointer to it. The node
-// index argument is a string that should be a single digit, used to generate
-// the server ID, name, and address.
-func makeServerState(nodeIndex string, nodeState RaftState, healthy bool) *ServerState {
-	return &ServerState{
-		Server: Server{
-			ID:          raft.ServerID(fmt.Sprintf("%[1]s%[1]s-%[1]s-%[1]s-%[1]s-%[1]s%[1]s%[1]s", strings.Repeat(nodeIndex, 4))),
-			Name:        fmt.Sprintf("node%s", nodeIndex),
-			Address:     raft.ServerAddress(fmt.Sprintf("198.18.0.%s:8300", nodeIndex)),
-			NodeStatus:  NodeAlive,
-			Version:     "1.9.0",
-			RaftVersion: 3,
-		},
-		State: nodeState,
-		Health: ServerHealth{
-			Healthy: healthy,
-		},
 	}
 }
 
