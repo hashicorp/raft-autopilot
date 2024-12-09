@@ -40,6 +40,9 @@ func (a *Autopilot) reconcile() error {
 		if _, err := a.applyDemotions(state, changes, true); err != nil {
 			return err
 		}
+		// We are proceeding with promotions regardless of the outcome of the demotion,
+		// as long as there were no errors. This is to avoid having to wait for another
+		// reconciliation round before the promotions take place.
 	}
 
 	// apply the promotions, if we did apply any then stop here
