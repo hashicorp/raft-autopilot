@@ -130,7 +130,7 @@ func (a *Autopilot) applyPromotions(state *State, changes RaftChanges) (bool, er
 //   - If demoteSingleFailedServer is true, then a single demotion will be applied
 //     to an unhealthy server and the function will return. We limit this to a
 //     single demotion to prevent violating the minimum quorum setting.
-//   - If demoteSingleFailedServer is false, then the all of the demotions will be
+//   - If demoteSingleFailedServer is false, then all of the demotions will be
 //     applied regardless of the health status of the servers.
 //
 // IDs in the change set will be ignored if:
