@@ -34,7 +34,7 @@ func (a *Autopilot) reconcile() error {
 
 	// Apply the demotion to a failed server first, but only a single one per a
 	// reconciliation round and if the number of voters is odd. In that case we
-	// don't want to start with the promotions, since that temporalily inflates
+	// don't want to start with the promotions, since that temporarily inflates
 	// quorum, which could lead to cluster failure if more voters fail.
 	if len(state.Voters)%2 != 0 {
 		if _, err := a.applyDemotions(state, changes, true); err != nil {
