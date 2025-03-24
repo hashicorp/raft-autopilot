@@ -41,6 +41,13 @@ jobs:
         go-version-file: 'go.mod'
         cache: true
     - name: Run tests
-      run: go test -race ./...
+      run: go test -race -v -coverprofile=coverage.out ./...
     - name: Build Go
       run: go build ./...
+    - name: Upload coverage report 
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        path: coverage.out
+        name: coverage-report
+    - name: Display coverage report
+      run: go tool cover -func=coverage.out
