@@ -1,8 +1,11 @@
 name: ci
 
 on:
+  pull_request:
+    branches: ["master"]
   push:
-    branches: ["coverage-test"]
+    branches: ["master"]
+    tags: ["*"]
 
 jobs:
   go-fmt-and-vet:
