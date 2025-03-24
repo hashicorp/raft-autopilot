@@ -28,6 +28,8 @@ jobs:
         fi
     - name: Vet go
       run: go vet ./...
+    - name: Run golangci-lint 
+      uses: golangci/golangci-lint-action@08e2f20817b15149a52b5b3ebe7de50aff2ba8c5
 
   go-test:
     needs: go-fmt-and-vet
