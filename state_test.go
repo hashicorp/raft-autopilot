@@ -7,7 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -24,7 +24,7 @@ func loadTestData(t *testing.T, name string) string {
 
 	fpath := filepath.Join("testdata", name)
 
-	data, err := ioutil.ReadFile(fpath)
+	data, err := os.ReadFile(fpath)
 	require.NoError(t, err)
 
 	return string(data)
@@ -37,7 +37,7 @@ func loadGolden(t *testing.T, name string, got string, shouldUpdate bool) string
 
 	golden := filepath.Join("testdata", fname)
 	if shouldUpdate && got != "" {
-		err := ioutil.WriteFile(golden, []byte(got), 0644)
+		err := os.WriteFile(golden, []byte(got), 0644)
 		require.NoError(t, err)
 	}
 

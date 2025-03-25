@@ -44,7 +44,6 @@ func (a *Autopilot) Start(ctx context.Context) {
 
 	go a.beginExecution(ctx, exec)
 	a.execution = exec
-	return
 }
 
 // Stop will terminate the go routines being executed to perform autopilot.
