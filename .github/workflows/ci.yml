@@ -12,9 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
-      uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # pin@v3.3.0
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # pin@v5.0.0
     - name: Setup go
-      uses: actions/setup-go@6edd4406fa81c3da01a34fa6f6343087c207a568 # pin@v3.5.0
+      uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # pin@v6.0.0
       with:
         go-version-file: 'go.mod'
         cache: true
@@ -29,16 +29,16 @@ jobs:
     - name: Vet go
       run: go vet ./...
     - name: Run golangci-lint 
-      uses: golangci/golangci-lint-action@08e2f20817b15149a52b5b3ebe7de50aff2ba8c5
+      uses: golangci/golangci-lint-action@0a35821d5c230e903fcfe077583637dea1b27b47
 
   go-test:
     needs: go-fmt-and-vet
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
-      uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # pin@v3.3.0
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # pin@v5.0.0
     - name: Setup go
-      uses: actions/setup-go@6edd4406fa81c3da01a34fa6f6343087c207a568 # pin@v3.5.0
+      uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # pin@v6.0.0
       with:
         go-version-file: 'go.mod'
         cache: true
@@ -47,7 +47,7 @@ jobs:
     - name: Build Go
       run: go build ./...
     - name: Upload coverage report 
-      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
       with:
         path: coverage.out
         name: coverage-report
