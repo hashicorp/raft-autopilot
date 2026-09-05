@@ -1047,3 +1047,24 @@ func TestPruneDeadServersDisabled(t *testing.T) {
 		WithReconciliationDisabled())
 	require.NoError(t, ap.pruneDeadServers())
 }
+
+func TestAdjudicateRemovalNilEligibility(t *testing.T) {
+	conf := &Config{MinQuorum: 3}
+	mapp := NewMockApplicationIntegration(t)
+	mapp.On("AutopilotConfig").Return(conf)
+
+	a := &Autopilot{
+		logger:   hclog.NewNullLogger(),
+		delegate: mapp,
+	}
+
+	vr := newVoterRegistry()
+	vr.eligibility["known-voter"] = &voterEligibility{
+		currentVoter:   true,
+		potentialVoter: true,
+	}
+
+	unknown := raft.ServerID("unknown-server")
+	got := a.adjudicateRemoval([]raft.ServerID{unknown}, vr)
+	require.Equal(t, []raft.ServerID{unknown}, got)
+}

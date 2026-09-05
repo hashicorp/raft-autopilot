@@ -332,7 +332,7 @@ func (a *Autopilot) adjudicateRemoval(ids []raft.ServerID, vr *voterRegistry) []
 
 		if v != nil && v.isPotentialVoter() && initialPotentialVoters-removedPotentialVoters-1 < int(minQuorum) {
 			a.logger.Debug("will not remove server node as it would leave less voters than the minimum number allowed", "id", id, "min", minQuorum)
-		} else if v.isCurrentVoter() && maxRemoval < 1 {
+		} else if v != nil && v.isCurrentVoter() && maxRemoval < 1 {
 			a.logger.Debug("will not remove server node as removal of a majority of voting servers is not safe", "id", id)
 		} else if v != nil && v.isPotentialVoter() {
 			maxRemoval--
